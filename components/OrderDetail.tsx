@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Order, Language, OrderStatus, Product, OrderItem, DeliveryService, PaymentStatus, PaymentMethod } from '../types';
 import { UI_TEXT } from '../constants';
@@ -101,7 +98,7 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, products, lang, onBack
     // Mock API Call to Nova Poshta / Rozetka
     const prefix = currentOrder.deliveryService === 'rozetka_delivery' ? 'ROZ' : '20';
     const mockTTN = prefix + Math.floor(Math.random() * 100000000000).toString();
-    const updated = { ...currentOrder, ttn: mockTTN, status: OrderStatus.PROCESSING };
+    const updated = { ...currentOrder, ttn: mockTTN, status: OrderStatus.ACCEPTED };
     setCurrentOrder(updated);
     onUpdate(updated);
   };
@@ -159,6 +156,21 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, products, lang, onBack
   const getSku = (productId: number) => {
       const p = products.find(prod => prod.id === productId);
       return p ? p.sku : '---';
+  };
+
+  // Helper labels for specific Enums
+  const getStatusLabel = (s: OrderStatus) => {
+      switch(s) {
+          case OrderStatus.NEW: return t.statusNew;
+          case OrderStatus.ACCEPTED: return t.statusAccepted;
+          case OrderStatus.ORDERED: return t.statusOrdered;
+          case OrderStatus.SHIPPED: return t.statusShipped;
+          case OrderStatus.DELIVERED: return t.statusDelivered;
+          case OrderStatus.RECEIVED: return t.statusReceived;
+          case OrderStatus.CANCELED: return t.statusCanceled;
+          case OrderStatus.RETURN: return t.statusReturn;
+          default: return s;
+      }
   };
 
   return (
@@ -225,17 +237,19 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, products, lang, onBack
                           onChange={(e) => handlePaymentChange('paymentStatus', e.target.value)}
                           className={inputClass}
                       >
-                          {Object.values(PaymentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                          <option value={PaymentStatus.NOT_PAID}>{t.paymentNotPaid}</option>
+                          <option value={PaymentStatus.PAID}>{t.paymentPaid}</option>
                       </select>
                   </div>
                   <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">{t.paymentMethod}</label>
                       <select 
-                          value={currentOrder.paymentMethod || PaymentMethod.COD}
+                          value={currentOrder.paymentMethod || PaymentMethod.ON_RECEIPT}
                           onChange={(e) => handlePaymentChange('paymentMethod', e.target.value)}
                           className={inputClass}
                       >
-                          {Object.values(PaymentMethod).map(m => <option key={m} value={m}>{m}</option>)}
+                          <option value={PaymentMethod.CARD}>{t.methodCard}</option>
+                          <option value={PaymentMethod.ON_RECEIPT}>{t.methodOnReceipt}</option>
                       </select>
                   </div>
               </div>
@@ -355,7 +369,7 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, products, lang, onBack
                           className="border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                        >
                          {Object.values(OrderStatus).map(s => (
-                           <option key={s} value={s}>{s}</option>
+                           <option key={s} value={s}>{getStatusLabel(s)}</option>
                          ))}
                        </select>
                    </div>

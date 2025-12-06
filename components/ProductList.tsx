@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo } from 'react';
 import { Product, Language } from '../types';
 import { UI_TEXT } from '../constants';
@@ -21,6 +20,15 @@ interface ColumnMapping {
   category: string;
 }
 
+// Helper for Diff
+interface DiffItem {
+  type: 'new' | 'update';
+  newProduct: Product;
+  existingProduct?: Product;
+  changes?: string[];
+  selected: boolean;
+}
+
 const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProduct, onAddProduct }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
@@ -30,12 +38,13 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
   
   // State for Import
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importStep, setImportStep] = useState<1 | 2>(1);
+  const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
     sku: '', name_ru: '', name_uk: '', price: '', stock: '', category: ''
   });
+  const [diffItems, setDiffItems] = useState<DiffItem[]>([]);
   
   // State for the Margin Calculator
   const [calcMargin, setCalcMargin] = useState<number>(0);
@@ -65,7 +74,6 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
 
   const handleEdit = (product: Product) => {
     setEditingProduct({ ...product });
-    // Calculate initial margin for display
     const margin = product.purchasePrice > 0 
       ? ((product.price - product.purchasePrice) / product.purchasePrice) * 100 
       : 0;
@@ -100,8 +108,6 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
   const handlePurchasePriceChange = (cost: number) => {
     const updated = { ...editingProduct, purchasePrice: cost };
     setEditingProduct(updated);
-    
-    // Recalculate Margin based on current Price
     if (cost > 0 && (updated.price || 0) > 0) {
       const margin = ((updated.price! - cost) / cost) * 100;
       setCalcMargin(Number(margin.toFixed(2)));
@@ -111,8 +117,6 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
   const handlePriceChange = (price: number) => {
     const updated = { ...editingProduct, price: price };
     setEditingProduct(updated);
-
-    // Recalculate Margin based on current Purchase Price
     if ((updated.purchasePrice || 0) > 0) {
       const margin = ((price - updated.purchasePrice!) / updated.purchasePrice!) * 100;
       setCalcMargin(Number(margin.toFixed(2)));
@@ -121,8 +125,6 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
 
   const handleMarginChange = (margin: number) => {
     setCalcMargin(margin);
-    
-    // Recalculate Price based on Purchase Price and new Margin
     if ((editingProduct.purchasePrice || 0) > 0) {
       const newPrice = editingProduct.purchasePrice! * (1 + margin / 100);
       setEditingProduct({ ...editingProduct, price: Number(newPrice.toFixed(2)) });
@@ -131,11 +133,9 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
 
   const handleGenerateDescription = async (targetLang: Language) => {
     if (!editingProduct.name_ru && !editingProduct.name_uk) return;
-    
     setIsGenerating(true);
     const name = targetLang === Language.RU ? editingProduct.name_ru : editingProduct.name_uk;
     const desc = await generateProductDescription(name || 'Pet Product', editingProduct.category || 'General', targetLang);
-    
     setEditingProduct(prev => ({
       ...prev,
       [targetLang === Language.RU ? 'description_ru' : 'description_uk']: desc
@@ -147,50 +147,80 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setImportFile(e.target.files[0]);
-      // Simulating reading headers
-      // In a real app, use 'xlsx' or 'papaparse'
       setTimeout(() => {
-        setFileHeaders(['Column A', 'Column B', 'Item Name', 'Price (UAH)', 'Stock Qty', 'Category', 'SKU_Code']);
+        setFileHeaders(['SKU', 'Name_RU', 'Price', 'Stock', 'Category', 'Legacy_Code']);
         setImportStep(2);
       }, 500);
     }
   };
 
-  const handleImportExecute = () => {
-    // Simulate importing 2 products using the mapping
-    const newProducts: Product[] = [
+  const handleAnalyzeImport = () => {
+    // Mock parsing data based on mapping
+    // Here we simulate 1 New Product and 1 Existing Product (Collision)
+    const mockParsedData: Partial<Product>[] = [
       {
-        id: Date.now() + 1,
-        sku: "IMPORTED-001",
-        name_ru: "Импортированный Товар 1",
-        name_uk: "Імпортований Товар 1",
-        description_ru: "Описание из файла",
-        description_uk: "Опис з файлу",
-        price: 500,
-        purchasePrice: 300,
-        stock: 100,
-        category: "Imported",
-        imageUrl: "https://picsum.photos/200/200"
+        sku: "DOG-FOOD-001", // Collides with mock product 1
+        name_ru: "Корм для собак Премиум 10кг (Updated)",
+        price: 1300, // Changed from 1200
+        stock: 50,
+        category: "Food"
       },
       {
-        id: Date.now() + 2,
-        sku: "IMPORTED-002",
-        name_ru: "Импортированный Товар 2",
-        name_uk: "Імпортований Товар 2",
-        description_ru: "Описание из файла",
-        description_uk: "Опис з файлу",
-        price: 250,
-        purchasePrice: 100,
-        stock: 50,
-        category: "Imported",
-        imageUrl: "https://picsum.photos/200/200"
+        sku: "NEW-ITEM-999",
+        name_ru: "Новый Импортный Товар",
+        name_uk: "Новий Імпортний Товар",
+        price: 900,
+        stock: 20,
+        category: "Accessories"
       }
     ];
 
-    newProducts.forEach(p => onAddProduct(p));
-    setIsImportModalOpen(false);
-    setImportStep(1);
-    setImportFile(null);
+    const comparison: DiffItem[] = mockParsedData.map(row => {
+        const existing = products.find(p => p.sku === row.sku);
+        if (existing) {
+            const changes = [];
+            if (row.price !== existing.price) changes.push(`Price: ${existing.price} -> ${row.price}`);
+            if (row.stock !== existing.stock) changes.push(`Stock: ${existing.stock} -> ${row.stock}`);
+            
+            return {
+                type: 'update',
+                newProduct: { ...existing, ...row } as Product,
+                existingProduct: existing,
+                changes,
+                selected: true
+            };
+        } else {
+            return {
+                type: 'new',
+                newProduct: { ...row, id: Date.now() + Math.random(), purchasePrice: 0, imageUrl: 'https://picsum.photos/200/200' } as Product,
+                selected: true
+            };
+        }
+    });
+
+    setDiffItems(comparison);
+    setImportStep(3);
+  };
+
+  const handleExecuteImport = () => {
+      diffItems.forEach(item => {
+          if (item.selected) {
+              if (item.type === 'update') {
+                  onUpdateProduct(item.newProduct);
+              } else {
+                  onAddProduct(item.newProduct);
+              }
+          }
+      });
+      setIsImportModalOpen(false);
+      setImportStep(1);
+      setImportFile(null);
+  };
+
+  const toggleDiffSelection = (index: number) => {
+      const newItems = [...diffItems];
+      newItems[index].selected = !newItems[index].selected;
+      setDiffItems(newItems);
   };
 
   return (
@@ -314,18 +344,20 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
       {/* Import Modal */}
       {isImportModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-xl p-6 border dark:border-slate-700">
+           <div className={`bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full ${importStep === 3 ? 'max-w-4xl' : 'max-w-xl'} p-6 border dark:border-slate-700 flex flex-col max-h-[90vh]`}>
              <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-800 dark:text-white">{t.import}</h3>
+               <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                   {t.import} - {importStep === 1 ? 'Select File' : importStep === 2 ? 'Map Columns' : 'Review & Confirm'}
+               </h3>
                <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
              </div>
 
+             {/* Step 1: File Selection */}
              {importStep === 1 && (
                <div className="space-y-6">
                  <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-10 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <span className="text-4xl mb-3">📂</span>
                     <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">{t.importDesc}</p>
-                    <p className="text-xs text-slate-400 mb-4">Supported: .xlsx, .xml, .csv</p>
                     <label className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm">
                       {t.selectFile}
                       <input type="file" className="hidden" accept=".csv,.xlsx,.xml" onChange={handleFileSelect} />
@@ -334,12 +366,13 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                </div>
              )}
 
+             {/* Step 2: Mapping */}
              {importStep === 2 && (
                <div className="space-y-4">
                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.mapDesc}</p>
                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700 max-h-64 overflow-y-auto">
                    {[
-                     { key: 'sku', label: 'SKU' },
+                     { key: 'sku', label: 'SKU (Key)' },
                      { key: 'name_ru', label: 'Name (RU)' },
                      { key: 'price', label: 'Price' },
                      { key: 'stock', label: 'Stock' },
@@ -361,19 +394,76 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                  </div>
                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
                     <button onClick={() => setImportStep(1)} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 text-sm font-medium">{t.back}</button>
-                    <button onClick={handleImportExecute} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">{t.startImport}</button>
+                    <button onClick={handleAnalyzeImport} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">{t.reviewChanges}</button>
                  </div>
                </div>
+             )}
+
+             {/* Step 3: Diff Review */}
+             {importStep === 3 && (
+                 <div className="flex flex-col flex-1 overflow-hidden">
+                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.reviewDesc}</p>
+                     
+                     <div className="flex-1 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                         <table className="w-full text-sm text-left">
+                             <thead className="bg-slate-50 dark:bg-slate-700 text-xs uppercase text-slate-500 dark:text-slate-300 font-semibold sticky top-0">
+                                 <tr>
+                                     <th className="px-4 py-2 w-10"></th>
+                                     <th className="px-4 py-2">Product</th>
+                                     <th className="px-4 py-2">Status</th>
+                                     <th className="px-4 py-2">Changes</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                 {diffItems.map((item, idx) => (
+                                     <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 ${!item.selected ? 'opacity-50' : ''}`}>
+                                         <td className="px-4 py-3">
+                                             <input type="checkbox" checked={item.selected} onChange={() => toggleDiffSelection(idx)} />
+                                         </td>
+                                         <td className="px-4 py-3">
+                                             <div className="font-bold text-slate-800 dark:text-slate-200">{lang === Language.RU ? item.newProduct.name_ru : item.newProduct.name_uk}</div>
+                                             <div className="text-xs text-slate-500 font-mono">{item.newProduct.sku}</div>
+                                         </td>
+                                         <td className="px-4 py-3">
+                                             <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${item.type === 'new' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                 {item.type === 'new' ? t.newProduct : t.updateProduct}
+                                             </span>
+                                         </td>
+                                         <td className="px-4 py-3 text-xs">
+                                             {item.type === 'new' ? (
+                                                 <span className="text-slate-400">Ready to create</span>
+                                             ) : (
+                                                 <ul className="list-disc pl-4 text-slate-600 dark:text-slate-400">
+                                                     {item.changes && item.changes.length > 0 ? item.changes.map((c, i) => (
+                                                         <li key={i}>{c}</li>
+                                                     )) : (
+                                                         <li>No significant changes</li>
+                                                     )}
+                                                 </ul>
+                                             )}
+                                         </td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     </div>
+
+                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700 mt-4">
+                        <button onClick={() => setImportStep(2)} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 text-sm font-medium">{t.back}</button>
+                        <button onClick={handleExecuteImport} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">{t.applyUpdate}</button>
+                     </div>
+                 </div>
              )}
            </div>
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit Modal (Kept from previous steps) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border dark:border-slate-700">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white dark:bg-slate-800 z-10">
+             {/* ... (Existing Edit Modal Content) ... */}
+             <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white dark:bg-slate-800 z-10">
               <h3 className="text-xl font-bold text-slate-800 dark:text-white">
                 {editingProduct.id ? t.edit : t.addProduct}
               </h3>

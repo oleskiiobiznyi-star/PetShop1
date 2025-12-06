@@ -1,8 +1,6 @@
 
-
-
 import React, { useState, useEffect } from 'react';
-import { Language, ViewState, Product, Order, AppSettings, Supplier } from './types';
+import { Language, ViewState, Product, Order, AppSettings, Supplier, OrderStatus, OrderSource, PaymentStatus, PaymentMethod } from './types';
 import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS } from './constants';
 import Dashboard from './components/Dashboard';
 import ProductList from './components/ProductList';
@@ -40,7 +38,7 @@ const App: React.FC = () => {
     totalSales: orders.reduce((acc, curr) => acc + curr.total, 0),
     totalOrders: orders.length,
     averageCheck: orders.reduce((acc, curr) => acc + curr.total, 0) / orders.length,
-    pendingOrders: orders.filter(o => o.status === 'new' || o.status === 'processing').length
+    pendingOrders: orders.filter(o => o.status === OrderStatus.NEW || o.status === OrderStatus.ACCEPTED).length
   };
 
   const handleNavClick = (view: ViewState) => {
@@ -50,6 +48,30 @@ const App: React.FC = () => {
 
   const handleUpdateOrder = (updatedOrder: Order) => {
     setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+  };
+
+  const handleCreateOrder = () => {
+    const newId = Date.now();
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    const newOrder: Order = {
+        id: newId,
+        orderNumber: `ORD-${dateStr}-${randSuffix}`,
+        source: OrderSource.MANUAL,
+        customerName: '',
+        status: OrderStatus.NEW,
+        paymentStatus: PaymentStatus.NOT_PAID,
+        paymentMethod: PaymentMethod.ON_RECEIPT,
+        date: today.toISOString(),
+        total: 0,
+        items: []
+    };
+    
+    setOrders([newOrder, ...orders]);
+    setCurrentView('orders');
+    setSelectedOrderId(newId);
   };
 
   const handleUpdateProduct = (updatedProduct: Product) => {
@@ -164,6 +186,7 @@ const App: React.FC = () => {
               orders={orders} 
               lang={lang} 
               onSelectOrder={(id) => setSelectedOrderId(id)}
+              onCreateOrder={handleCreateOrder}
             />
           )}
 

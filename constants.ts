@@ -1,9 +1,7 @@
 
-
-
 import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier } from './types';
 
-export const APP_VERSION = "2.4";
+export const APP_VERSION = "2.6";
 export const APP_DATE = "03 December 2025";
 
 export const MOCK_SUPPLIERS: Supplier[] = [
@@ -73,7 +71,7 @@ export const MOCK_ORDERS: Order[] = [
     total: 1350,
     status: OrderStatus.NEW,
     paymentStatus: PaymentStatus.NOT_PAID,
-    paymentMethod: PaymentMethod.COD,
+    paymentMethod: PaymentMethod.ON_RECEIPT,
     date: "2025-12-03T10:30:00",
     items: [{ productId: 1, productName: "Корм для собак Премиум 10кг", quantity: 1, price: 1100, discount: 0 }, { productId: 2, productName: "Игрушка 'Мышка'", quantity: 1, price: 250, discount: 0 }]
   },
@@ -105,9 +103,9 @@ export const MOCK_ORDERS: Order[] = [
     deliveryService: "nova_poshta",
     deliveryWarehouse: "Branch #10",
     total: 2400,
-    status: OrderStatus.PROCESSING,
-    paymentStatus: PaymentStatus.PARTIALLY_PAID,
-    paymentMethod: PaymentMethod.IBAN,
+    status: OrderStatus.ACCEPTED,
+    paymentStatus: PaymentStatus.NOT_PAID,
+    paymentMethod: PaymentMethod.CARD,
     date: "2025-12-03T09:00:00",
     items: [{ productId: 1, productName: "Корм для собак Премиум 10кг", quantity: 2, price: 1200, discount: 0 }]
   }
@@ -121,6 +119,7 @@ export const UI_TEXT = {
     orders: "Заказы",
     analytics: "Аналитика",
     settings: "Настройки",
+    createOrder: "Создать заказ",
     addProduct: "Добавить товар",
     edit: "Редактировать",
     save: "Сохранить",
@@ -171,6 +170,13 @@ export const UI_TEXT = {
     fileColumn: "Колонка в файле",
     systemField: "Поле в системе",
     startImport: "Начать импорт",
+    reviewChanges: "Проверка изменений",
+    reviewDesc: "Найдены совпадения. Подтвердите обновления.",
+    newProduct: "Новый",
+    updateProduct: "Обновление",
+    applyUpdate: "Применить",
+    oldValue: "Старое",
+    newValue: "Новое",
     receiving: "Приемка товара",
     receiveStock: "Принять",
     currentStock: "Текущий остаток",
@@ -191,7 +197,27 @@ export const UI_TEXT = {
     createReceipt: "Создать поступление",
     selectSupplier: "Выберите поставщика",
     financials: "Финансы",
-    netProfit: "Чистая прибыль"
+    netProfit: "Чистая прибыль",
+    addToReceipt: "Добавить в список",
+    receiptList: "Список поступления",
+    finishReceipt: "Провести поступление",
+    statusNew: "Новый",
+    statusAccepted: "Принят",
+    statusOrdered: "Заказан у поставщика",
+    statusShipped: "Отправлен",
+    statusDelivered: "Доставлен",
+    statusReceived: "Получен",
+    statusCanceled: "Отменен",
+    statusReturn: "Возврат",
+    paymentPaid: "Оплачен",
+    paymentNotPaid: "Не оплачен",
+    methodCard: "Картой",
+    methodOnReceipt: "При получении",
+    totalGoodsValue: "Сумма закупки (Поставщику)",
+    totalLandedValue: "Себестоимость (Склад)",
+    unitCost: "Цена ед.",
+    landedCost: "Себестоим.",
+    costDistribution: "Расходы распределены по стоимости"
   },
   [Language.UK]: {
     dashboard: "Дашборд",
@@ -200,6 +226,7 @@ export const UI_TEXT = {
     orders: "Замовлення",
     analytics: "Аналітика",
     settings: "Налаштування",
+    createOrder: "Створити замовлення",
     addProduct: "Додати товар",
     edit: "Редагувати",
     save: "Зберегти",
@@ -250,6 +277,13 @@ export const UI_TEXT = {
     fileColumn: "Колонка у файлі",
     systemField: "Поле в системі",
     startImport: "Почати імпорт",
+    reviewChanges: "Перевірка змін",
+    reviewDesc: "Знайдено збіги. Підтвердіть оновлення.",
+    newProduct: "Новий",
+    updateProduct: "Оновлення",
+    applyUpdate: "Застосувати",
+    oldValue: "Старе",
+    newValue: "Нове",
     receiving: "Приймання товару",
     receiveStock: "Прийняти",
     currentStock: "Поточний залишок",
@@ -270,6 +304,26 @@ export const UI_TEXT = {
     createReceipt: "Створити надходження",
     selectSupplier: "Оберіть постачальника",
     financials: "Фінанси",
-    netProfit: "Чистий прибуток"
+    netProfit: "Чистий прибуток",
+    addToReceipt: "Додати до списку",
+    receiptList: "Список надходження",
+    finishReceipt: "Провести надходження",
+    statusNew: "Нове замовлення",
+    statusAccepted: "Прийнято",
+    statusOrdered: "Замовлено",
+    statusShipped: "Відправлено",
+    statusDelivered: "Доставлено",
+    statusReceived: "Отримано",
+    statusCanceled: "Скасовано",
+    statusReturn: "Повернення",
+    paymentPaid: "Оплачено",
+    paymentNotPaid: "Не оплачено",
+    methodCard: "Карткою",
+    methodOnReceipt: "При отриманні",
+    totalGoodsValue: "Сума закупівлі (Постачальнику)",
+    totalLandedValue: "Собівартість (Склад)",
+    unitCost: "Ціна од.",
+    landedCost: "Собіварт.",
+    costDistribution: "Витрати розподілені за вартістю"
   }
 };

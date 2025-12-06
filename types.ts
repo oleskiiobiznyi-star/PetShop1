@@ -12,24 +12,24 @@ export enum OrderSource {
 }
 
 export enum OrderStatus {
-  NEW = 'new',
-  PROCESSING = 'processing',
-  SHIPPED = 'shipped',
-  DELIVERED = 'delivered',
-  CANCELED = 'canceled'
+  NEW = 'new',           // Новый заказ
+  ACCEPTED = 'accepted', // Принят
+  ORDERED = 'ordered',   // Заказан (у поставщика)
+  SHIPPED = 'shipped',   // Отправлен
+  DELIVERED = 'delivered', // Доставлен (на отделение)
+  RECEIVED = 'received',   // Получен (клиентом)
+  CANCELED = 'canceled',   // Отменен
+  RETURN = 'return'        // Возврат
 }
 
 export enum PaymentStatus {
   PAID = 'paid',
-  NOT_PAID = 'not_paid',
-  PARTIALLY_PAID = 'partially_paid'
+  NOT_PAID = 'not_paid'
 }
 
 export enum PaymentMethod {
-  CASH = 'cash',
   CARD = 'card',
-  IBAN = 'iban',
-  COD = 'cod' // Cash on Delivery
+  ON_RECEIPT = 'on_receipt' // При получении
 }
 
 export type DeliveryService = 'nova_poshta' | 'rozetka_delivery' | 'ukrposhta' | 'self_pickup';
