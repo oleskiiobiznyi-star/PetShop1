@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Language, ViewState, Product, Order, AppSettings, Supplier, Customer, OrderStatus, OrderSource, PaymentStatus, PaymentMethod, Category, WarehouseReceipt } from './types';
 import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS, MOCK_CUSTOMERS, MOCK_CATEGORIES, MOCK_RECEIPTS } from './constants';
@@ -79,12 +80,69 @@ const App: React.FC = () => {
     setSelectedOrderId(null); 
   };
 
+  // Helper to determine if an order subtracts from stock
+  const isOrderActive = (status: OrderStatus) => {
+      return status !== OrderStatus.CANCELED && status !== OrderStatus.RETURN;
+  };
+
   const handleUpdateOrder = (updatedOrder: Order) => {
+    const oldOrder = orders.find(o => o.id === updatedOrder.id);
+    
+    if (oldOrder) {
+        setProducts(prevProducts => {
+            const stockChanges = new Map<number, number>();
+
+            // 1. Revert Old Order usage if it was active (Add back to stock)
+            if (isOrderActive(oldOrder.status)) {
+                oldOrder.items.forEach(item => {
+                    const current = stockChanges.get(item.productId) || 0;
+                    stockChanges.set(item.productId, current + item.quantity);
+                });
+            }
+
+            // 2. Apply New Order usage if it is active (Deduct from stock)
+            if (isOrderActive(updatedOrder.status)) {
+                updatedOrder.items.forEach(item => {
+                    const current = stockChanges.get(item.productId) || 0;
+                    stockChanges.set(item.productId, current - item.quantity);
+                });
+            }
+
+            // Apply calculated changes to product state
+            if (stockChanges.size > 0) {
+                return prevProducts.map(p => {
+                    const change = stockChanges.get(p.id);
+                    if (change !== undefined && change !== 0) {
+                        return { ...p, stock: p.stock + change };
+                    }
+                    return p;
+                });
+            }
+            return prevProducts;
+        });
+    }
+
     setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
   };
 
   const handleDeleteOrder = (id: number) => {
-    setOrders(orders.filter(o => o.id !== id));
+    const orderToDelete = orders.find(o => o.id === id);
+    
+    // Restore stock if deleting an active order
+    if (orderToDelete && isOrderActive(orderToDelete.status)) {
+         setProducts(prevProducts => {
+            const updates = new Map(orderToDelete.items.map(i => [i.productId, i.quantity]));
+            return prevProducts.map(p => {
+                const qtyToAdd = updates.get(p.id);
+                if (qtyToAdd) {
+                    return { ...p, stock: p.stock + qtyToAdd };
+                }
+                return p;
+            });
+        });
+    }
+
+    setOrders(prev => prev.filter(o => o.id !== id));
     if (selectedOrderId === id) setSelectedOrderId(null);
   };
 
@@ -107,63 +165,83 @@ const App: React.FC = () => {
         items: []
     };
     
-    setOrders([newOrder, ...orders]);
+    setOrders(prev => [newOrder, ...prev]);
     setCurrentView('orders');
     setSelectedOrderId(newId);
   };
 
   const handleUpdateProduct = (updatedProduct: Product) => {
-    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  };
+
+  // Optimized batch handler for Imports and Warehouse Receipts
+  const handleBatchProductUpdate = (newItems: Product[], updatedItems: Product[]) => {
+      setProducts(prevProducts => {
+          let current = [...prevProducts];
+          
+          // 1. Apply Updates
+          if (updatedItems.length > 0) {
+              const updateMap = new Map(updatedItems.map(p => [p.id, p]));
+              current = current.map(p => updateMap.get(p.id) || p);
+          }
+          
+          // 2. Append New
+          if (newItems.length > 0) {
+              current = [...newItems, ...current];
+          }
+          
+          return current;
+      });
   };
 
   const handleDeleteProduct = (id: number) => {
-    setProducts(products.filter(p => p.id !== id));
+    setProducts(prev => prev.filter(p => p.id !== id));
   };
 
   const handleCreateReceipt = (receipt: WarehouseReceipt) => {
-      setWarehouseReceipts([receipt, ...warehouseReceipts]);
+      setWarehouseReceipts(prev => [receipt, ...prev]);
   };
 
   const handleDeleteReceipt = (id: number) => {
-      setWarehouseReceipts(warehouseReceipts.filter(r => r.id !== id));
+      setWarehouseReceipts(prev => prev.filter(r => r.id !== id));
   };
 
   const handleMarkReceiptPaid = (id: number) => {
-      setWarehouseReceipts(warehouseReceipts.map(r => 
+      setWarehouseReceipts(prev => prev.map(r => 
           r.id === id ? { ...r, isPaid: true } : r
       ));
   };
 
   // Directory Handlers
   const handleUpdateSupplier = (updated: Supplier) => {
-      setSuppliers(suppliers.map(s => s.id === updated.id ? updated : s));
+      setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s));
   };
   const handleAddSupplier = (newSupplier: Supplier) => {
-      setSuppliers([...suppliers, newSupplier]);
+      setSuppliers(prev => [...prev, newSupplier]);
   };
   const handleDeleteSupplier = (id: number) => {
-      setSuppliers(suppliers.filter(s => s.id !== id));
+      setSuppliers(prev => prev.filter(s => s.id !== id));
   };
 
   const handleUpdateCustomer = (updated: Customer) => {
-      setCustomers(customers.map(c => c.id === updated.id ? updated : c));
+      setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
   };
   const handleAddCustomer = (newCustomer: Customer) => {
-      setCustomers([...customers, newCustomer]);
+      setCustomers(prev => [...prev, newCustomer]);
   };
   const handleDeleteCustomer = (id: number) => {
-      setCustomers(customers.filter(c => c.id !== id));
+      setCustomers(prev => prev.filter(c => c.id !== id));
   };
 
   // Category Handlers
   const handleUpdateCategory = (updated: Category) => {
-      setCategories(categories.map(c => c.id === updated.id ? updated : c));
+      setCategories(prev => prev.map(c => c.id === updated.id ? updated : c));
   };
   const handleAddCategory = (newCategory: Category) => {
-      setCategories([...categories, newCategory]);
+      setCategories(prev => [...prev, newCategory]);
   };
   const handleDeleteCategory = (id: number) => {
-      setCategories(categories.filter(c => c.id !== id));
+      setCategories(prev => prev.filter(c => c.id !== id));
   };
 
   const NavItem = ({ view, icon, label }: { view: ViewState; icon: React.ReactNode; label: string }) => (
@@ -258,8 +336,9 @@ const App: React.FC = () => {
               products={products} 
               lang={lang}
               onUpdateProduct={handleUpdateProduct}
-              onAddProduct={(p) => setProducts([p, ...products])}
+              onAddProduct={(p) => setProducts(prev => [p, ...prev])}
               onDeleteProduct={handleDeleteProduct}
+              onBatchProductUpdate={handleBatchProductUpdate}
             />
           )}
 
@@ -268,6 +347,7 @@ const App: React.FC = () => {
               products={products}
               lang={lang}
               onUpdateProduct={handleUpdateProduct}
+              onBatchProductUpdate={handleBatchProductUpdate}
               suppliers={suppliers}
               onCreateReceipt={handleCreateReceipt}
             />

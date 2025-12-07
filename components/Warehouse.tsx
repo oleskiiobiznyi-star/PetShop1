@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Product, Language, Supplier, WarehouseReceipt, ReceiptItem } from '../types';
 import { UI_TEXT } from '../constants';
@@ -7,11 +6,12 @@ interface WarehouseProps {
   products: Product[];
   lang: Language;
   onUpdateProduct: (product: Product) => void;
+  onBatchProductUpdate: (newItems: Product[], updatedItems: Product[]) => void;
   suppliers: Supplier[];
   onCreateReceipt: (receipt: WarehouseReceipt) => void;
 }
 
-const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, suppliers, onCreateReceipt }) => {
+const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, onBatchProductUpdate, suppliers, onCreateReceipt }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // New Receipt State
@@ -129,15 +129,15 @@ const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, 
 
 
   const handleFinalizeReceipt = () => {
-      // 1. Update Product Costs & Stock
-      calculatedItems.forEach(item => {
-           const updatedProduct: Product = {
-               ...item.product,
-               stock: item.product.stock + item.qty,
-               purchasePrice: parseFloat(item.landedUnitCost.toFixed(2)) // Updates to new Landed Cost
-           };
-           onUpdateProduct(updatedProduct);
-      });
+      // 1. Prepare Batch Updates for Products
+      const productUpdates: Product[] = calculatedItems.map(item => ({
+          ...item.product,
+          stock: item.product.stock + item.qty,
+          purchasePrice: parseFloat(item.landedUnitCost.toFixed(2)) // Update to new Landed Cost
+      }));
+
+      // Execute Batch Update
+      onBatchProductUpdate([], productUpdates);
 
       // 2. Create Receipt Record for Settlements
       if (receiptSupplier) {

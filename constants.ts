@@ -1,10 +1,5 @@
 
 
-
-
-
-
-
 import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier, Customer, Category, WarehouseReceipt } from './types';
 
 export const APP_VERSION = "2.9";
@@ -158,6 +153,38 @@ export const MOCK_ORDERS: Order[] = [
   }
 ];
 
+// Real Geographic Coordinates for Leaflet Map
+export const CITY_COORDINATES: Record<string, { lat: number, lng: number }> = {
+  "Kyiv": { lat: 50.4501, lng: 30.5234 },
+  "Kiev": { lat: 50.4501, lng: 30.5234 },
+  "Lviv": { lat: 49.8397, lng: 24.0297 },
+  "Odessa": { lat: 46.4825, lng: 30.7233 },
+  "Odesa": { lat: 46.4825, lng: 30.7233 },
+  "Kharkiv": { lat: 49.9935, lng: 36.2304 },
+  "Dnipro": { lat: 48.4647, lng: 35.0462 },
+  "Zaporizhzhia": { lat: 47.8388, lng: 35.1396 },
+  "Vinnytsia": { lat: 49.2331, lng: 28.4682 },
+  "Rivne": { lat: 50.6199, lng: 26.2516 },
+  "Ivano-Frankivsk": { lat: 48.9226, lng: 24.7111 },
+  "Chernihiv": { lat: 51.4982, lng: 31.2893 },
+  "Sumy": { lat: 50.9077, lng: 34.7981 },
+  "Poltava": { lat: 49.5883, lng: 34.5514 },
+  "Mykolaiv": { lat: 46.9750, lng: 31.9946 },
+  "Kherson": { lat: 46.6354, lng: 32.6169 },
+  "Cherkasy": { lat: 49.4444, lng: 32.0598 },
+  "Zhytomyr": { lat: 50.2547, lng: 28.6587 },
+  "Khmelnytskyi": { lat: 49.4230, lng: 26.9871 },
+  "Chernivtsi": { lat: 48.2921, lng: 25.9352 },
+  "Ternopil": { lat: 49.5535, lng: 25.5948 },
+  "Lutsk": { lat: 50.7472, lng: 25.3254 },
+  "Uzhhorod": { lat: 48.6208, lng: 22.2879 },
+  "Kropyvnytskyi": { lat: 48.5079, lng: 32.2623 },
+  "Luhansk": { lat: 48.5740, lng: 39.3078 },
+  "Donetsk": { lat: 48.0159, lng: 37.8028 },
+  "Simferopol": { lat: 44.9572, lng: 34.1108 },
+  "Sevastopol": { lat: 44.6166, lng: 33.5254 }
+};
+
 export const UI_TEXT = {
   [Language.RU]: {
     dashboard: "Дашборд",
@@ -293,7 +320,14 @@ export const UI_TEXT = {
     allTime: "Все время",
     selectPeriod: "Выберите период",
     receiptDetails: "Детали накладной",
-    close: "Закрыть"
+    close: "Закрыть",
+    invoicesCount: "К-во накладных",
+    totalDebt: "Общий долг",
+    backToSuppliers: "К списку поставщиков",
+    revenueComparison: "Сравнение выручки",
+    ordersComparison: "Сравнение к-ва заказов",
+    geoDistribution: "Географія продажів",
+    confirmDelete: "Вы действительно хотите удалить этот товар?"
   },
   [Language.UK]: {
     dashboard: "Дашборд",
@@ -428,7 +462,14 @@ export const UI_TEXT = {
     lastMonth: "Минулий місяць",
     allTime: "Весь час",
     selectPeriod: "Оберіть період",
-    receiptDetails: "Деталі накладної",
-    close: "Закрити"
+    receiptDetails: "Деталі накладной",
+    close: "Закрити",
+    invoicesCount: "К-сть накладних",
+    totalDebt: "Загальний борг",
+    backToSuppliers: "До списку постачальників",
+    revenueComparison: "Порівняння доходу",
+    ordersComparison: "Порівняння к-сті замовлень",
+    geoDistribution: "Географія продажів",
+    confirmDelete: "Ви дійсно хочете видалити цей товар?"
   }
 };

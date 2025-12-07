@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import { Product, Language } from '../types';
 import { UI_TEXT } from '../constants';
 import { generateProductDescription } from '../services/geminiService';
+import * as XLSX from 'xlsx';
 
 interface ProductListProps {
   products: Product[];
@@ -9,13 +11,16 @@ interface ProductListProps {
   onUpdateProduct: (product: Product) => void;
   onAddProduct: (product: Product) => void;
   onDeleteProduct: (id: number) => void;
+  onBatchProductUpdate: (newItems: Product[], updatedItems: Product[]) => void;
 }
 
 interface ColumnMapping {
   sku: string;
+  barcode: string;
   name_ru: string;
   name_uk: string;
   price: string;
+  purchasePrice: string;
   stock: string;
   category: string;
 }
@@ -29,7 +34,7 @@ interface DiffItem {
   selected: boolean;
 }
 
-const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProduct, onAddProduct, onDeleteProduct }) => {
+const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProduct, onAddProduct, onDeleteProduct, onBatchProductUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,10 +44,10 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
   // State for Import
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
-  const [importFile, setImportFile] = useState<File | null>(null);
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [parsedImportData, setParsedImportData] = useState<any[]>([]); // Unified structure for CSV/XLSX/XML
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
-    sku: '', name_ru: '', name_uk: '', price: '', stock: '', category: ''
+    sku: '', barcode: '', name_ru: '', name_uk: '', price: '', purchasePrice: '', stock: '', category: ''
   });
   const [diffItems, setDiffItems] = useState<DiffItem[]>([]);
   
@@ -81,8 +86,9 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
+  const handleDelete = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (window.confirm(t.confirmDelete)) {
         onDeleteProduct(id);
     }
   };
@@ -150,77 +156,194 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
   };
 
   // --- Import Logic ---
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImportFile(e.target.files[0]);
-      setTimeout(() => {
-        setFileHeaders(['SKU', 'Name_RU', 'Price', 'Stock', 'Category', 'Legacy_Code']);
-        setImportStep(2);
-      }, 500);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        const fileName = file.name.toLowerCase();
+        
+        let headers: string[] = [];
+        let data: any[] = [];
+
+        // --- EXCEL Parsing ---
+        if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+            const dataBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(dataBuffer);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            data = XLSX.utils.sheet_to_json(worksheet);
+            
+            if (data.length > 0) {
+                headers = Object.keys(data[0]);
+            }
+        } 
+        // --- XML Parsing ---
+        else if (fileName.endsWith('.xml')) {
+            const text = await file.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, "text/xml");
+            
+            const root = xmlDoc.documentElement;
+            const rows = Array.from(root.children);
+            
+            if (rows.length > 0) {
+                data = rows.map(row => {
+                    const obj: any = {};
+                    Array.from(row.children).forEach(child => {
+                        obj[child.tagName] = child.textContent;
+                    });
+                    return obj;
+                });
+                if (data.length > 0) {
+                    headers = Object.keys(data[0]);
+                }
+            }
+        }
+        // --- CSV / Text Parsing ---
+        else {
+            const text = await file.text();
+            const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+            
+            if (lines.length > 0) {
+                const headerLine = lines[0];
+                const commaCount = (headerLine.match(/,/g) || []).length;
+                const semiCount = (headerLine.match(/;/g) || []).length;
+                const tabCount = (headerLine.match(/\t/g) || []).length;
+                
+                let separator = ',';
+                if (semiCount > commaCount && semiCount > tabCount) separator = ';';
+                if (tabCount > commaCount && tabCount > semiCount) separator = '\t';
+
+                headers = headerLine.split(separator).map(h => h.trim().replace(/^"|"$/g, ''));
+                
+                // Parse rows
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(separator).map(v => v.trim().replace(/^"|"$/g, ''));
+                    const obj: any = {};
+                    headers.forEach((h, idx) => {
+                        obj[h] = values[idx];
+                    });
+                    data.push(obj);
+                }
+            }
+        }
+
+        if (headers.length > 0) {
+            setFileHeaders(headers);
+            setParsedImportData(data); // Store unified data
+
+            // Intelligent Auto-Mapping
+            const newMapping = { ...columnMapping };
+            headers.forEach(h => {
+                const lower = h.toLowerCase();
+                if (lower.includes('sku') || lower.includes('art')) newMapping.sku = h;
+                else if (lower.includes('bar') || lower.includes('ean') || lower.includes('code')) newMapping.barcode = h;
+                else if (lower.includes('name') && lower.includes('uk')) newMapping.name_uk = h;
+                else if (lower.includes('name')) newMapping.name_ru = h;
+                else if (lower.includes('purchase') || lower.includes('cost')) newMapping.purchasePrice = h;
+                else if (lower.includes('price')) newMapping.price = h;
+                else if (lower.includes('stock') || lower.includes('qty')) newMapping.stock = h;
+                else if (lower.includes('cat')) newMapping.category = h;
+            });
+            setColumnMapping(newMapping);
+            setImportStep(2);
+        } else {
+            alert("Could not parse headers. File might be empty or invalid.");
+        }
+
+      }
+    } catch (err) {
+        console.error("Error parsing file:", err);
+        alert("Failed to read file. Please ensure valid CSV, Excel, or XML format.");
     }
   };
 
   const handleAnalyzeImport = () => {
-    // Mock parsing data based on mapping
-    // Here we simulate 1 New Product and 1 Existing Product (Collision)
-    const mockParsedData: Partial<Product>[] = [
-      {
-        sku: "DOG-FOOD-001", // Collides with mock product 1
-        name_ru: "Корм для собак Премиум 10кг (Updated)",
-        price: 1300, // Changed from 1200
-        stock: 50,
-        category: "Food"
-      },
-      {
-        sku: "NEW-ITEM-999",
-        name_ru: "Новый Импортный Товар",
-        name_uk: "Новий Імпортний Товар",
-        price: 900,
-        stock: 20,
-        category: "Accessories"
-      }
-    ];
+    try {
+        const comparison: DiffItem[] = [];
 
-    const comparison: DiffItem[] = mockParsedData.map(row => {
-        const existing = products.find(p => p.sku === row.sku);
-        if (existing) {
-            const changes = [];
-            if (row.price !== existing.price) changes.push(`Price: ${existing.price} -> ${row.price}`);
-            if (row.stock !== existing.stock) changes.push(`Stock: ${existing.stock} -> ${row.stock}`);
-            
-            return {
-                type: 'update',
-                newProduct: { ...existing, ...row } as Product,
-                existingProduct: existing,
-                changes,
-                selected: true
-            };
-        } else {
-            return {
-                type: 'new',
-                newProduct: { ...row, id: Date.now() + Math.random(), purchasePrice: 0, imageUrl: 'https://picsum.photos/200/200' } as Product,
-                selected: true
-            };
-        }
-    });
+        parsedImportData.forEach(rowData => {
+            const sku = rowData[columnMapping.sku];
+            if (!sku) return; 
 
-    setDiffItems(comparison);
-    setImportStep(3);
+            const mappedProduct: Partial<Product> = {
+                sku: String(sku),
+                name_ru: rowData[columnMapping.name_ru] || 'New Product',
+                name_uk: rowData[columnMapping.name_uk] || rowData[columnMapping.name_ru] || 'Новий товар',
+                price: parseFloat(rowData[columnMapping.price]) || 0,
+                purchasePrice: parseFloat(rowData[columnMapping.purchasePrice]) || 0,
+                stock: parseInt(rowData[columnMapping.stock]) || 0,
+                category: rowData[columnMapping.category] || 'Uncategorized',
+                barcode: rowData[columnMapping.barcode] ? String(rowData[columnMapping.barcode]) : '',
+                description_ru: '',
+                description_uk: '',
+                imageUrl: 'https://picsum.photos/200/200'
+            };
+
+            const existing = products.find(p => p.sku === mappedProduct.sku);
+
+            if (existing) {
+                const changes: string[] = [];
+                
+                if (mappedProduct.price && mappedProduct.price !== existing.price) 
+                    changes.push(`Price: ${existing.price} -> ${mappedProduct.price}`);
+                
+                if (mappedProduct.purchasePrice && mappedProduct.purchasePrice !== existing.purchasePrice) 
+                    changes.push(`Cost: ${existing.purchasePrice} -> ${mappedProduct.purchasePrice}`);
+                
+                if (mappedProduct.stock !== undefined && mappedProduct.stock !== existing.stock) 
+                    changes.push(`Stock: ${existing.stock} -> ${mappedProduct.stock}`);
+
+                if (mappedProduct.barcode && mappedProduct.barcode !== existing.barcode)
+                    changes.push(`Barcode updated`);
+
+                if (changes.length > 0) {
+                    comparison.push({
+                        type: 'update',
+                        newProduct: { ...existing, ...mappedProduct, id: existing.id } as Product,
+                        existingProduct: existing,
+                        changes,
+                        selected: true
+                    });
+                }
+            } else {
+                comparison.push({
+                    type: 'new',
+                    newProduct: { ...mappedProduct, id: Date.now() + Math.random() } as Product,
+                    selected: true
+                });
+            }
+        });
+
+        setDiffItems(comparison);
+        setImportStep(3);
+    } catch (e) {
+        alert("Error analyzing data.");
+        console.error(e);
+    }
   };
 
   const handleExecuteImport = () => {
+      const newItems: Product[] = [];
+      const updatedItems: Product[] = [];
+
       diffItems.forEach(item => {
           if (item.selected) {
               if (item.type === 'update') {
-                  onUpdateProduct(item.newProduct);
+                  updatedItems.push(item.newProduct);
               } else {
-                  onAddProduct(item.newProduct);
+                  newItems.push(item.newProduct);
               }
           }
       });
+
+      // Execute batch update to App.tsx
+      onBatchProductUpdate(newItems, updatedItems);
+
       setIsImportModalOpen(false);
       setImportStep(1);
-      setImportFile(null);
+      setParsedImportData([]);
+      setDiffItems([]);
   };
 
   const toggleDiffSelection = (index: number) => {
@@ -228,11 +351,16 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
       newItems[index].selected = !newItems[index].selected;
       setDiffItems(newItems);
   };
+  
+  const toggleSelectAll = () => {
+      const allSelected = diffItems.every(i => i.selected);
+      setDiffItems(diffItems.map(i => ({ ...i, selected: !allSelected })));
+  };
 
   return (
     <div className="flex gap-6 h-[calc(100vh-140px)]">
       {/* Category Sidebar */}
-      <div className="w-48 flex-shrink-0 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 overflow-y-auto">
+      <div className="w-48 flex-shrink-0 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 overflow-y-auto hidden md:block">
         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 text-sm uppercase">{t.category}</h3>
         <div className="space-y-1">
           {categories.map(cat => (
@@ -338,7 +466,8 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                           {t.edit}
                         </button>
                         <button 
-                          onClick={() => handleDelete(product.id)}
+                          type="button"
+                          onClick={(e) => handleDelete(e, product.id)}
                           className="text-red-500 hover:text-red-700 font-medium"
                         >
                           {t.delete}
@@ -369,10 +498,16 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                <div className="space-y-6">
                  <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-10 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <span className="text-4xl mb-3">📂</span>
-                    <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">{t.importDesc}</p>
-                    <label className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm">
+                    <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">{t.importDesc} (CSV, XLSX, XML)</p>
+                    <label className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm relative">
                       {t.selectFile}
-                      <input type="file" className="hidden" accept=".csv,.xlsx,.xml" onChange={handleFileSelect} />
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept=".csv, .txt, .xlsx, .xls, .xml" 
+                        onChange={handleFileSelect} 
+                        onClick={(e) => (e.target as HTMLInputElement).value = ''}
+                      />
                     </label>
                  </div>
                </div>
@@ -384,9 +519,12 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.mapDesc}</p>
                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700 max-h-64 overflow-y-auto">
                    {[
-                     { key: 'sku', label: 'SKU (Key)' },
+                     { key: 'sku', label: 'SKU (Required)' },
+                     { key: 'barcode', label: 'Barcode' },
                      { key: 'name_ru', label: 'Name (RU)' },
-                     { key: 'price', label: 'Price' },
+                     { key: 'name_uk', label: 'Name (UK)' },
+                     { key: 'price', label: 'Sale Price' },
+                     { key: 'purchasePrice', label: 'Purchase Price' },
                      { key: 'stock', label: 'Stock' },
                      { key: 'category', label: 'Category' }
                    ].map((field) => (
@@ -420,14 +558,22 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                          <table className="w-full text-sm text-left">
                              <thead className="bg-slate-50 dark:bg-slate-700 text-xs uppercase text-slate-500 dark:text-slate-300 font-semibold sticky top-0">
                                  <tr>
-                                     <th className="px-4 py-2 w-10"></th>
+                                     <th className="px-4 py-2 w-10">
+                                         <input type="checkbox" onChange={toggleSelectAll} />
+                                     </th>
                                      <th className="px-4 py-2">Product</th>
                                      <th className="px-4 py-2">Status</th>
                                      <th className="px-4 py-2">Changes</th>
                                  </tr>
                              </thead>
                              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                 {diffItems.map((item, idx) => (
+                                 {diffItems.length === 0 ? (
+                                     <tr>
+                                         <td colSpan={4} className="p-4 text-center text-slate-400">
+                                             No valid items found or no changes detected.
+                                         </td>
+                                     </tr>
+                                 ) : diffItems.map((item, idx) => (
                                      <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 ${!item.selected ? 'opacity-50' : ''}`}>
                                          <td className="px-4 py-3">
                                              <input type="checkbox" checked={item.selected} onChange={() => toggleDiffSelection(idx)} />
