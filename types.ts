@@ -41,6 +41,22 @@ export interface Supplier {
   phone: string;
 }
 
+export interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email?: string;
+  city?: string;
+  note?: string;
+}
+
+export interface Category {
+  id: number;
+  name_ru: string;
+  name_uk: string;
+  parentId?: number | null; // For nesting
+}
+
 export interface Product {
   id: number;
   sku: string;
@@ -53,7 +69,7 @@ export interface Product {
   purchasePrice: number; // Cost Price
   promotional_price?: number;
   stock: number;
-  category: string;
+  category: string; // Legacy string, could be mapped to Category ID in future
   imageUrl: string;
 }
 
@@ -100,4 +116,4 @@ export interface AppSettings {
   bankCommission: number; // Percentage
 }
 
-export type ViewState = 'dashboard' | 'products' | 'warehouse' | 'orders' | 'analytics' | 'settings';
+export type ViewState = 'dashboard' | 'products' | 'warehouse' | 'orders' | 'directories' | 'analytics' | 'settings';

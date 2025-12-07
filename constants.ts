@@ -1,13 +1,31 @@
 
-import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier } from './types';
 
-export const APP_VERSION = "2.6";
+
+import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier, Customer, Category } from './types';
+
+export const APP_VERSION = "2.8";
 export const APP_DATE = "03 December 2025";
 
 export const MOCK_SUPPLIERS: Supplier[] = [
   { id: 1, name: "PetFood Ukraine LLC", contactPerson: "Sergey", phone: "+380501112233" },
   { id: 2, name: "ZooPostach Ltd", contactPerson: "Olga", phone: "+380672223344" },
   { id: 3, name: "KormTech Import", contactPerson: "Andriy", phone: "+380933334455" }
+];
+
+export const MOCK_CUSTOMERS: Customer[] = [
+  { id: 1, name: "Ivan Petrenko", phone: "+380501234567", city: "Kyiv", email: "ivan@example.com" },
+  { id: 2, name: "Maria Kovalenko", phone: "+380679876543", city: "Lviv", note: "VIP client" },
+  { id: 3, name: "Oleg Bondar", phone: "+380935554433", city: "Odessa" }
+];
+
+export const MOCK_CATEGORIES: Category[] = [
+  { id: 1, name_ru: "Собаки", name_uk: "Собаки", parentId: null },
+  { id: 2, name_ru: "Коты", name_uk: "Коти", parentId: null },
+  { id: 3, name_ru: "Корм для собак", name_uk: "Корм для собак", parentId: 1 },
+  { id: 4, name_ru: "Сухой корм", name_uk: "Сухий корм", parentId: 3 },
+  { id: 5, name_ru: "Влажный корм", name_uk: "Вологий корм", parentId: 3 },
+  { id: 6, name_ru: "Игрушки", name_uk: "Іграшки", parentId: 1 },
+  { id: 7, name_ru: "Аксессуары", name_uk: "Аксесуари", parentId: 2 }
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -118,6 +136,7 @@ export const UI_TEXT = {
     warehouse: "Склад",
     orders: "Заказы",
     analytics: "Аналитика",
+    directories: "Справочники",
     settings: "Настройки",
     createOrder: "Создать заказ",
     addProduct: "Добавить товар",
@@ -140,6 +159,7 @@ export const UI_TEXT = {
     printInvoice: "Печать накладной",
     shippingDetails: "Доставка",
     customer: "Клиент",
+    customers: "Клиенты",
     items: "Товары",
     aiPackaging: "AI Помощник упаковки",
     address: "Адрес",
@@ -159,6 +179,7 @@ export const UI_TEXT = {
     margin: "Маржа %",
     barcode: "Штрихкод",
     category: "Категория",
+    categories: "Категории",
     allCategories: "Все категории",
     integrations: "Интеграции API",
     apiKeys: "API Ключи",
@@ -192,6 +213,7 @@ export const UI_TEXT = {
     bankCommission: "Комиссия банка (%)",
     fetchFromTTN: "Обновить по ТТН",
     supplier: "Поставщик",
+    suppliers: "Поставщики",
     extraCosts: "Доп. расходы (Доставка и др.)",
     paymentDate: "Дата оплаты",
     createReceipt: "Создать поступление",
@@ -217,7 +239,17 @@ export const UI_TEXT = {
     totalLandedValue: "Себестоимость (Склад)",
     unitCost: "Цена ед.",
     landedCost: "Себестоим.",
-    costDistribution: "Расходы распределены по стоимости"
+    costDistribution: "Расходы распределены по стоимости",
+    addSupplier: "Добавить поставщика",
+    addCustomer: "Добавить клиента",
+    addCategory: "Добавить категорию",
+    contactPerson: "Контактное лицо",
+    email: "Email",
+    note: "Примечание",
+    parentCategory: "Родительская категория",
+    rootCategory: "Корневая категория (Нет)",
+    nameRU: "Название (RU)",
+    nameUK: "Название (UK)"
   },
   [Language.UK]: {
     dashboard: "Дашборд",
@@ -225,6 +257,7 @@ export const UI_TEXT = {
     warehouse: "Склад",
     orders: "Замовлення",
     analytics: "Аналітика",
+    directories: "Довідники",
     settings: "Налаштування",
     createOrder: "Створити замовлення",
     addProduct: "Додати товар",
@@ -247,7 +280,8 @@ export const UI_TEXT = {
     printInvoice: "Друк накладної",
     shippingDetails: "Доставка",
     customer: "Клієнт",
-    items: "Товари",
+    customers: "Клієнти",
+    items: "Товары",
     aiPackaging: "AI Помічник пакування",
     address: "Адреса",
     ttn: "ТТН",
@@ -266,6 +300,7 @@ export const UI_TEXT = {
     margin: "Маржа %",
     barcode: "Штрихкод",
     category: "Категорія",
+    categories: "Категорії",
     allCategories: "Всі категорії",
     integrations: "Інтеграції API",
     apiKeys: "API Ключі",
@@ -299,6 +334,7 @@ export const UI_TEXT = {
     bankCommission: "Комісія банку (%)",
     fetchFromTTN: "Оновити по ТТН",
     supplier: "Постачальник",
+    suppliers: "Постачальники",
     extraCosts: "Дод. витрати (Доставка та ін.)",
     paymentDate: "Дата оплати",
     createReceipt: "Створити надходження",
@@ -324,6 +360,16 @@ export const UI_TEXT = {
     totalLandedValue: "Собівартість (Склад)",
     unitCost: "Ціна од.",
     landedCost: "Собіварт.",
-    costDistribution: "Витрати розподілені за вартістю"
+    costDistribution: "Витрати розподілені за вартістю",
+    addSupplier: "Додати постачальника",
+    addCustomer: "Додати клієнта",
+    addCategory: "Додати категорію",
+    contactPerson: "Контактна особа",
+    email: "Email",
+    note: "Примітка",
+    parentCategory: "Батьківська категорія",
+    rootCategory: "Коренева категорія (Немає)",
+    nameRU: "Назва (RU)",
+    nameUK: "Назва (UK)"
   }
 };

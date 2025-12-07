@@ -1,13 +1,15 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Language, ViewState, Product, Order, AppSettings, Supplier, OrderStatus, OrderSource, PaymentStatus, PaymentMethod } from './types';
-import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS } from './constants';
+import { Language, ViewState, Product, Order, AppSettings, Supplier, Customer, OrderStatus, OrderSource, PaymentStatus, PaymentMethod, Category } from './types';
+import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS, MOCK_CUSTOMERS, MOCK_CATEGORIES } from './constants';
 import Dashboard from './components/Dashboard';
 import ProductList from './components/ProductList';
 import OrderList from './components/OrderList';
 import OrderDetail from './components/OrderDetail';
 import Settings from './components/Settings';
 import Warehouse from './components/Warehouse';
+import Directories from './components/Directories';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -15,6 +17,8 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
+  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
@@ -78,6 +82,38 @@ const App: React.FC = () => {
     setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
   };
 
+  // Directory Handlers
+  const handleUpdateSupplier = (updated: Supplier) => {
+      setSuppliers(suppliers.map(s => s.id === updated.id ? updated : s));
+  };
+  const handleAddSupplier = (newSupplier: Supplier) => {
+      setSuppliers([...suppliers, newSupplier]);
+  };
+  const handleDeleteSupplier = (id: number) => {
+      setSuppliers(suppliers.filter(s => s.id !== id));
+  };
+
+  const handleUpdateCustomer = (updated: Customer) => {
+      setCustomers(customers.map(c => c.id === updated.id ? updated : c));
+  };
+  const handleAddCustomer = (newCustomer: Customer) => {
+      setCustomers([...customers, newCustomer]);
+  };
+  const handleDeleteCustomer = (id: number) => {
+      setCustomers(customers.filter(c => c.id !== id));
+  };
+
+  // Category Handlers
+  const handleUpdateCategory = (updated: Category) => {
+      setCategories(categories.map(c => c.id === updated.id ? updated : c));
+  };
+  const handleAddCategory = (newCategory: Category) => {
+      setCategories([...categories, newCategory]);
+  };
+  const handleDeleteCategory = (id: number) => {
+      setCategories(categories.filter(c => c.id !== id));
+  };
+
   const NavItem = ({ view, icon, label }: { view: ViewState; icon: React.ReactNode; label: string }) => (
     <button
       onClick={() => handleNavClick(view)}
@@ -103,7 +139,7 @@ const App: React.FC = () => {
               my-dog.com.ua
             </h1>
           </div>
-          <p className="text-xs text-slate-400 mt-1 pl-10 font-medium tracking-wide">CRM & WMS v2.4</p>
+          <p className="text-xs text-slate-400 mt-1 pl-10 font-medium tracking-wide">CRM & WMS v2.7</p>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -111,6 +147,7 @@ const App: React.FC = () => {
           <NavItem view="products" icon="📦" label={lang === Language.RU ? 'Товары' : 'Товари'} />
           <NavItem view="warehouse" icon="🏭" label={lang === Language.RU ? 'Склад' : 'Склад'} />
           <NavItem view="orders" icon="🛒" label={lang === Language.RU ? 'Заказы' : 'Замовлення'} />
+          <NavItem view="directories" icon="📚" label={lang === Language.RU ? 'Справочники' : 'Довідники'} />
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
              <NavItem view="settings" icon="⚙️" label={lang === Language.RU ? 'Настройки' : 'Налаштування'} />
           </div>
@@ -199,6 +236,24 @@ const App: React.FC = () => {
               onUpdate={handleUpdateOrder}
               bankCommissionRate={appSettings.bankCommission}
             />
+          )}
+
+          {currentView === 'directories' && (
+              <Directories 
+                  lang={lang}
+                  suppliers={suppliers}
+                  customers={customers}
+                  categories={categories}
+                  onUpdateSupplier={handleUpdateSupplier}
+                  onAddSupplier={handleAddSupplier}
+                  onDeleteSupplier={handleDeleteSupplier}
+                  onUpdateCustomer={handleUpdateCustomer}
+                  onAddCustomer={handleAddCustomer}
+                  onDeleteCustomer={handleDeleteCustomer}
+                  onUpdateCategory={handleUpdateCategory}
+                  onAddCategory={handleAddCategory}
+                  onDeleteCategory={handleDeleteCategory}
+              />
           )}
 
           {currentView === 'settings' && (
