@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   LineChart, Line 
 } from 'recharts';
-import { DashboardMetrics, Language, Order, OrderStatus, WarehouseReceipt } from '../types';
+import { DashboardMetrics, Language, Order, OrderStatus, WarehouseReceipt, Expense } from '../types';
 import { UI_TEXT, CITY_COORDINATES } from '../constants';
 
 // Declare Leaflet global
@@ -12,13 +13,14 @@ declare const L: any;
 interface DashboardProps {
   orders: Order[];
   warehouseReceipts: WarehouseReceipt[];
+  expenses: Expense[];
   metrics: DashboardMetrics;
   lang: Language;
 }
 
 type Period = 'today' | 'tomorrow' | 'week' | 'last_week' | 'month' | 'last_month' | 'all';
 
-const Dashboard: React.FC<DashboardProps> = ({ orders, warehouseReceipts, metrics: globalMetrics, lang }) => {
+const Dashboard: React.FC<DashboardProps> = ({ orders, warehouseReceipts, expenses, metrics: globalMetrics, lang }) => {
   const t = UI_TEXT[lang];
   const [period, setPeriod] = useState<Period>('month');
   const mapRef = useRef<any>(null); // Leaflet Map Instance
@@ -105,7 +107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, warehouseReceipts, metric
   const { start, end, prevStart, prevEnd, groupBy } = useMemo(() => getDateRanges(period), [period]);
 
   // Filter Data based on Range
-  const { currentOrders, previousOrders, filteredReceipts } = useMemo(() => {
+  const { currentOrders, previousOrders, filteredReceipts, filteredExpenses } = useMemo(() => {
       const checkDate = (dateStr: string, s: Date, e: Date) => {
           const d = new Date(dateStr);
           return d >= s && d <= e;
@@ -117,9 +119,13 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, warehouseReceipts, metric
           filteredReceipts: warehouseReceipts.filter(r => {
              if (period === 'all') return true;
              return checkDate(r.paymentDueDate, start, end);
+          }),
+          filteredExpenses: expenses.filter(e => {
+              if (period === 'all') return true;
+              return checkDate(e.date, start, end);
           })
       };
-  }, [orders, warehouseReceipts, start, end, prevStart, prevEnd]);
+  }, [orders, warehouseReceipts, expenses, start, end, prevStart, prevEnd]);
 
   // Recalculate Metrics
   const localMetrics = useMemo(() => {
@@ -129,17 +135,21 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, warehouseReceipts, metric
       let netProfit = 0;
       currentOrders.forEach(order => {
           if (order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.RETURN) {
-              const estimatedCost = order.total * 0.7; 
+              const estimatedCost = order.total * 0.7; // Fallback COGS if needed, ideally use real calculation
               netProfit += (order.total - estimatedCost - (order.shippingCost || 0));
           }
       });
+      
+      // Subtract Business Expenses for this period
+      const expensesSum = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
+      netProfit -= expensesSum;
 
       const accountsPayable = filteredReceipts
           .filter(r => !r.isPaid)
           .reduce((acc, r) => acc + r.totalAmount, 0);
 
-      return { totalSales, totalOrders, netProfit, accountsPayable };
-  }, [currentOrders, filteredReceipts]);
+      return { totalSales, totalOrders, netProfit, accountsPayable, expensesSum };
+  }, [currentOrders, filteredReceipts, filteredExpenses]);
 
   // Chart Data Generation
   const chartData = useMemo(() => {
@@ -322,9 +332,11 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, warehouseReceipts, metric
         
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md transition-shadow">
           <p className="text-sm text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.netProfit}</p>
-          <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">₴ {localMetrics.netProfit.toLocaleString()}</p>
+          <p className={`text-3xl font-bold mt-2 ${localMetrics.netProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+              ₴ {localMetrics.netProfit.toLocaleString()}
+          </p>
           <span className="text-xs text-slate-400 font-medium flex items-center mt-2">
-            Est. Profit (Gross)
+            After COGS, Shipping, Fees & Expenses ({localMetrics.expensesSum.toLocaleString()})
           </span>
         </div>
 

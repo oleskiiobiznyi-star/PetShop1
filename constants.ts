@@ -1,8 +1,8 @@
 
 
-import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier, Customer, Category, WarehouseReceipt } from './types';
+import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier, Customer, Category, WarehouseReceipt, Expense } from './types';
 
-export const APP_VERSION = "2.9";
+export const APP_VERSION = "2.9.1";
 export const APP_DATE = "03 December 2025";
 
 export const MOCK_SUPPLIERS: Supplier[] = [
@@ -50,6 +50,11 @@ export const MOCK_RECEIPTS: WarehouseReceipt[] = [
       itemsCount: 20,
       items: [] 
     },
+];
+
+export const MOCK_EXPENSES: Expense[] = [
+    { id: 1, category: "Ads", description: "Google Ads November", amount: 5000, date: "2025-11-30" },
+    { id: 2, category: "Hosting", description: "AWS Server", amount: 1200, date: "2025-12-01" },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -194,7 +199,7 @@ export const UI_TEXT = {
     analytics: "Аналитика",
     directories: "Справочники",
     settings: "Настройки",
-    settlements: "Расчеты с поставщиками",
+    settlements: "Расчеты / Финансы",
     createOrder: "Создать заказ",
     addProduct: "Добавить товар",
     edit: "Редактировать",
@@ -327,7 +332,17 @@ export const UI_TEXT = {
     revenueComparison: "Сравнение выручки",
     ordersComparison: "Сравнение к-ва заказов",
     geoDistribution: "Географія продажів",
-    confirmDelete: "Вы действительно хотите удалить этот товар?"
+    confirmDelete: "Вы действительно хотите удалить этот товар?",
+    businessExpenses: "Расходы бизнеса",
+    addExpense: "Добавить расход",
+    expenseCategory: "Категория",
+    expenseAmount: "Сумма",
+    expenseDesc: "Описание",
+    catAds: "Реклама",
+    catHosting: "Хостинг/Сервер",
+    catSalary: "Зарплата",
+    catOther: "Другое",
+    totalExpenses: "Общие расходы"
   },
   [Language.UK]: {
     dashboard: "Дашборд",
@@ -337,7 +352,7 @@ export const UI_TEXT = {
     analytics: "Аналітика",
     directories: "Довідники",
     settings: "Налаштування",
-    settlements: "Розрахунки з постачальниками",
+    settlements: "Розрахунки / Фінанси",
     createOrder: "Створити замовлення",
     addProduct: "Додати товар",
     edit: "Редагувати",
@@ -470,6 +485,16 @@ export const UI_TEXT = {
     revenueComparison: "Порівняння доходу",
     ordersComparison: "Порівняння к-сті замовлень",
     geoDistribution: "Географія продажів",
-    confirmDelete: "Ви дійсно хочете видалити цей товар?"
+    confirmDelete: "Ви дійсно хочете видалити цей товар?",
+    businessExpenses: "Витрати бізнесу",
+    addExpense: "Додати витрату",
+    expenseCategory: "Категорія",
+    expenseAmount: "Сума",
+    expenseDesc: "Опис",
+    catAds: "Реклама",
+    catHosting: "Хостинг/Сервер",
+    catSalary: "Зарплата",
+    catOther: "Інше",
+    totalExpenses: "Загальні витрати"
   }
 };

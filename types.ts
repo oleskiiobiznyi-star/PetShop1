@@ -124,6 +124,14 @@ export interface WarehouseReceipt {
   items: ReceiptItem[];
 }
 
+export interface Expense {
+  id: number;
+  category: string; // Ads, Hosting, Salary, etc.
+  description: string;
+  amount: number;
+  date: string;
+}
+
 export interface DashboardMetrics {
   totalSales: number;
   totalOrders: number;

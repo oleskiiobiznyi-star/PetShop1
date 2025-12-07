@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Language, ViewState, Product, Order, AppSettings, Supplier, Customer, OrderStatus, OrderSource, PaymentStatus, PaymentMethod, Category, WarehouseReceipt } from './types';
-import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS, MOCK_CUSTOMERS, MOCK_CATEGORIES, MOCK_RECEIPTS } from './constants';
+import { Language, ViewState, Product, Order, AppSettings, Supplier, Customer, OrderStatus, OrderSource, PaymentStatus, PaymentMethod, Category, WarehouseReceipt, Expense } from './types';
+import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS, MOCK_CUSTOMERS, MOCK_CATEGORIES, MOCK_RECEIPTS, MOCK_EXPENSES } from './constants';
 import Dashboard from './components/Dashboard';
 import ProductList from './components/ProductList';
 import OrderList from './components/OrderList';
@@ -20,6 +21,7 @@ const App: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
   const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
   const [warehouseReceipts, setWarehouseReceipts] = useState<WarehouseReceipt[]>(MOCK_RECEIPTS);
+  const [expenses, setExpenses] = useState<Expense[]>(MOCK_EXPENSES);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
@@ -47,7 +49,7 @@ const App: React.FC = () => {
       const averageCheck = totalOrders > 0 ? totalSales / totalOrders : 0;
       const pendingOrders = orders.filter(o => o.status === OrderStatus.NEW || o.status === OrderStatus.ACCEPTED).length;
 
-      // 2. Net Profit Calculation (Revenue - COGS - ShippingExp - BankFee)
+      // 2. Net Profit Calculation (Revenue - COGS - ShippingExp - BankFee - Business Expenses)
       // Note: This is simplified. COGS should technically track historical cost, here using current product.purchasePrice
       let netProfit = 0;
       orders.forEach(order => {
@@ -64,6 +66,10 @@ const App: React.FC = () => {
               netProfit += (revenue - cogs - shipping - bankFee);
           }
       });
+      
+      // Subtract general expenses
+      const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+      netProfit -= totalExpenses;
 
       // 3. Accounts Payable
       const accountsPayable = warehouseReceipts
@@ -212,6 +218,15 @@ const App: React.FC = () => {
       ));
   };
 
+  // Expenses Handlers
+  const handleAddExpense = (expense: Expense) => {
+      setExpenses(prev => [...prev, expense]);
+  };
+
+  const handleDeleteExpense = (id: number) => {
+      setExpenses(prev => prev.filter(e => e.id !== id));
+  };
+
   // Directory Handlers
   const handleUpdateSupplier = (updated: Supplier) => {
       setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s));
@@ -269,7 +284,7 @@ const App: React.FC = () => {
               my-dog.com.ua
             </h1>
           </div>
-          <p className="text-xs text-slate-400 mt-1 pl-10 font-medium tracking-wide">CRM & WMS v2.9</p>
+          <p className="text-xs text-slate-400 mt-1 pl-10 font-medium tracking-wide">CRM & WMS v2.9.1</p>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -329,7 +344,15 @@ const App: React.FC = () => {
         </header>
 
         <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20">
-          {currentView === 'dashboard' && <Dashboard metrics={metrics} orders={orders} warehouseReceipts={warehouseReceipts} lang={lang} />}
+          {currentView === 'dashboard' && (
+            <Dashboard 
+                metrics={metrics} 
+                orders={orders} 
+                warehouseReceipts={warehouseReceipts} 
+                expenses={expenses}
+                lang={lang} 
+            />
+          )}
           
           {currentView === 'products' && (
             <ProductList 
@@ -396,8 +419,11 @@ const App: React.FC = () => {
               <SupplierSettlements
                   lang={lang}
                   receipts={warehouseReceipts}
+                  expenses={expenses}
                   onMarkPaid={handleMarkReceiptPaid}
                   onDeleteReceipt={handleDeleteReceipt}
+                  onAddExpense={handleAddExpense}
+                  onDeleteExpense={handleDeleteExpense}
               />
           )}
 
