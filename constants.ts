@@ -1,9 +1,13 @@
 
 
 
-import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier, Customer, Category } from './types';
 
-export const APP_VERSION = "2.8";
+
+
+
+import { Product, Order, OrderSource, OrderStatus, Language, PaymentStatus, PaymentMethod, Supplier, Customer, Category, WarehouseReceipt } from './types';
+
+export const APP_VERSION = "2.9";
 export const APP_DATE = "03 December 2025";
 
 export const MOCK_SUPPLIERS: Supplier[] = [
@@ -26,6 +30,31 @@ export const MOCK_CATEGORIES: Category[] = [
   { id: 5, name_ru: "Влажный корм", name_uk: "Вологий корм", parentId: 3 },
   { id: 6, name_ru: "Игрушки", name_uk: "Іграшки", parentId: 1 },
   { id: 7, name_ru: "Аксессуары", name_uk: "Аксесуари", parentId: 2 }
+];
+
+export const MOCK_RECEIPTS: WarehouseReceipt[] = [
+    { 
+      id: 1001, 
+      supplierId: 1, 
+      supplierName: "PetFood Ukraine LLC", 
+      date: "2023-11-25", 
+      paymentDueDate: "2023-12-10", 
+      totalAmount: 15000, 
+      isPaid: false, 
+      itemsCount: 50,
+      items: [] // Mock data empty for brevity
+    },
+    { 
+      id: 1002, 
+      supplierId: 2, 
+      supplierName: "ZooPostach Ltd", 
+      date: "2023-11-20", 
+      paymentDueDate: "2023-11-30", 
+      totalAmount: 5400, 
+      isPaid: true, 
+      itemsCount: 20,
+      items: [] 
+    },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -138,6 +167,7 @@ export const UI_TEXT = {
     analytics: "Аналитика",
     directories: "Справочники",
     settings: "Настройки",
+    settlements: "Расчеты с поставщиками",
     createOrder: "Создать заказ",
     addProduct: "Добавить товар",
     edit: "Редактировать",
@@ -215,7 +245,7 @@ export const UI_TEXT = {
     supplier: "Поставщик",
     suppliers: "Поставщики",
     extraCosts: "Доп. расходы (Доставка и др.)",
-    paymentDate: "Дата оплаты",
+    paymentDate: "Дата оплати",
     createReceipt: "Создать поступление",
     selectSupplier: "Выберите поставщика",
     financials: "Финансы",
@@ -249,7 +279,21 @@ export const UI_TEXT = {
     parentCategory: "Родительская категория",
     rootCategory: "Корневая категория (Нет)",
     nameRU: "Название (RU)",
-    nameUK: "Название (UK)"
+    nameUK: "Название (UK)",
+    dueDate: "Дата платежа",
+    accountsPayable: "К оплате поставщикам",
+    markPaid: "Оплатить",
+    paid: "Оплачено",
+    today: "Сегодня",
+    tomorrow: "Завтра",
+    thisWeek: "Текущая неделя",
+    lastWeek: "Прошлая неделя",
+    thisMonth: "Этот месяц",
+    lastMonth: "Прошлый месяц",
+    allTime: "Все время",
+    selectPeriod: "Выберите период",
+    receiptDetails: "Детали накладной",
+    close: "Закрыть"
   },
   [Language.UK]: {
     dashboard: "Дашборд",
@@ -259,6 +303,7 @@ export const UI_TEXT = {
     analytics: "Аналітика",
     directories: "Довідники",
     settings: "Налаштування",
+    settlements: "Розрахунки з постачальниками",
     createOrder: "Створити замовлення",
     addProduct: "Додати товар",
     edit: "Редагувати",
@@ -370,6 +415,20 @@ export const UI_TEXT = {
     parentCategory: "Батьківська категорія",
     rootCategory: "Коренева категорія (Немає)",
     nameRU: "Назва (RU)",
-    nameUK: "Назва (UK)"
+    nameUK: "Назва (UK)",
+    dueDate: "Дата платежа",
+    accountsPayable: "До сплати постачальникам",
+    markPaid: "Оплатити",
+    paid: "Оплачено",
+    today: "Сьогодні",
+    tomorrow: "Завтра",
+    thisWeek: "Поточний тиждень",
+    lastWeek: "Минулий тиждень",
+    thisMonth: "Цей місяць",
+    lastMonth: "Минулий місяць",
+    allTime: "Весь час",
+    selectPeriod: "Оберіть період",
+    receiptDetails: "Деталі накладної",
+    close: "Закрити"
   }
 };

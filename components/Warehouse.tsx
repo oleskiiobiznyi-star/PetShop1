@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Product, Language, Supplier } from '../types';
+import { Product, Language, Supplier, WarehouseReceipt, ReceiptItem } from '../types';
 import { UI_TEXT } from '../constants';
 
 interface WarehouseProps {
@@ -8,16 +8,10 @@ interface WarehouseProps {
   lang: Language;
   onUpdateProduct: (product: Product) => void;
   suppliers: Supplier[];
+  onCreateReceipt: (receipt: WarehouseReceipt) => void;
 }
 
-interface ReceiptItem {
-  product: Product;
-  qty: number;
-  supplierUnitPrice: number; // Price we pay the supplier
-  originalDbPrice: number; // Price currently in DB
-}
-
-const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, suppliers }) => {
+const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, suppliers, onCreateReceipt }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // New Receipt State
@@ -87,7 +81,10 @@ const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, 
           product: receiptProduct,
           qty: qty,
           supplierUnitPrice: price,
-          originalDbPrice: receiptProduct.purchasePrice
+          originalDbPrice: receiptProduct.purchasePrice,
+          supplierTotalCost: qty * price,
+          landedUnitCost: price, // Placeholder, updated in calculator
+          landedTotalCost: qty * price // Placeholder
       };
 
       setReceiptItems([...receiptItems, newItem]);
@@ -116,7 +113,7 @@ const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, 
         const ratio = totalSupplier > 0 ? itemSupplierTotal / totalSupplier : 0;
         const allocatedExtra = extra * ratio;
         const landedTotal = itemSupplierTotal + allocatedExtra;
-        const landedUnit = landedTotal / item.qty;
+        const landedUnit = item.qty > 0 ? landedTotal / item.qty : 0;
 
         return {
             ...item,
@@ -132,7 +129,7 @@ const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, 
 
 
   const handleFinalizeReceipt = () => {
-      // Apply updates to all products with the calculated Landed Unit Cost
+      // 1. Update Product Costs & Stock
       calculatedItems.forEach(item => {
            const updatedProduct: Product = {
                ...item.product,
@@ -142,284 +139,289 @@ const Warehouse: React.FC<WarehouseProps> = ({ products, lang, onUpdateProduct, 
            onUpdateProduct(updatedProduct);
       });
 
+      // 2. Create Receipt Record for Settlements
+      if (receiptSupplier) {
+          const supplierObj = suppliers.find(s => s.id.toString() === receiptSupplier);
+          const newReceipt: WarehouseReceipt = {
+              id: Date.now(),
+              supplierId: parseInt(receiptSupplier),
+              supplierName: supplierObj ? supplierObj.name : 'Unknown',
+              date: new Date().toISOString().split('T')[0],
+              paymentDueDate: paymentDate,
+              totalAmount: totalSupplierValue,
+              isPaid: false,
+              itemsCount: calculatedItems.reduce((acc, i) => acc + i.qty, 0),
+              items: calculatedItems // Save detailed items
+          };
+          onCreateReceipt(newReceipt);
+      }
+
       setIsReceiptModalOpen(false);
   };
 
   return (
-    <div className="space-y-6 h-full flex flex-col animate-fade-in">
+    <div className="space-y-6 animate-fade-in h-[calc(100vh-140px)] flex flex-col">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{t.warehouse}</h2>
-        <div className="flex gap-4">
-             <div className="w-64">
-                <input
-                    type="text"
-                    placeholder={t.search}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                />
-            </div>
-            <button 
-                onClick={() => handleOpenReceiptModal()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+        <div className="flex gap-2">
+            <input 
+                type="text" 
+                placeholder={t.search} 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
+             <button 
+              onClick={() => handleOpenReceiptModal()}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
             >
-                <span>📥</span> {t.createReceipt}
+              <span>+</span> {t.createReceipt}
             </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-1 overflow-hidden">
-        <div className="overflow-auto h-full">
-          <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-            <thead className="bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase font-semibold text-xs border-b border-slate-200 dark:border-slate-600 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-4">Product Info</th>
-                <th className="px-6 py-4">SKU / Barcode</th>
-                <th className="px-6 py-4 text-right">{t.purchasePrice}</th>
-                <th className="px-6 py-4 text-center">{t.stock}</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <td className="px-6 py-3">
-                    <div className="flex items-center gap-3">
-                      <img src={product.imageUrl} alt="" className="w-10 h-10 rounded border border-slate-200 dark:border-slate-600 object-cover" />
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        {lang === Language.RU ? product.name_ru : product.name_uk}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-3 font-mono text-xs">
-                    <div className="font-bold">{product.sku}</div>
-                    <div className="text-slate-400">{product.barcode || '-'}</div>
-                  </td>
-                  <td className="px-6 py-3 text-right">
-                    ₴ {product.purchasePrice.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-3 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                      product.stock > 10 ? 'bg-green-100 text-green-700' : 
-                      product.stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {product.stock}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={() => handleOpenReceiptModal(product)}
-                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium text-sm"
-                    >
-                      {t.receiveStock}
-                    </button>
-                  </td>
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-1 overflow-hidden flex flex-col">
+         <div className="overflow-auto flex-1">
+            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase font-semibold text-xs border-b border-slate-200 dark:border-slate-600 sticky top-0">
+                <tr>
+                  <th className="px-6 py-4">SKU / Barcode</th>
+                  <th className="px-6 py-4">Product Name</th>
+                  <th className="px-6 py-4 text-center">{t.stock}</th>
+                  <th className="px-6 py-4 text-right">{t.purchasePrice}</th>
+                  <th className="px-6 py-4 text-right">Value (Sum)</th>
+                  <th className="px-6 py-4 text-right">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {filteredProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                    <td className="px-6 py-4 font-mono text-xs">
+                       <div className="font-bold text-slate-700 dark:text-slate-200">{product.sku}</div>
+                       <div className="text-slate-400">{product.barcode || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                        {lang === Language.RU ? product.name_ru : product.name_uk}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
+                            {product.stock}
+                        </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">₴ {product.purchasePrice}</td>
+                    <td className="px-6 py-4 text-right text-slate-400">
+                         ₴ {(product.stock * product.purchasePrice).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                        <button 
+                            onClick={() => handleOpenReceiptModal(product)}
+                            className="text-green-600 hover:text-green-800 dark:text-green-400 font-medium"
+                        >
+                            + {t.addStock}
+                        </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+         </div>
       </div>
 
       {/* Batch Receipt Modal */}
       {isReceiptModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-5xl p-6 border border-slate-200 dark:border-slate-700 h-[85vh] flex flex-col">
-            <h3 className="text-lg font-bold mb-4 text-slate-800 dark:text-white flex items-center gap-2">
-                <span>📦</span> {t.receiving}
-            </h3>
-            
-            <div className="flex gap-6 flex-1 overflow-hidden">
-                {/* Left: Input Form */}
-                <div className="w-1/3 flex flex-col gap-4 border-r border-slate-100 dark:border-slate-700 pr-6 overflow-y-auto">
-                    <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">{t.supplier} & Info</label>
-                        <select 
-                            value={receiptSupplier}
-                            onChange={(e) => setReceiptSupplier(e.target.value)}
-                            className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none mb-3"
-                        >
-                            <option value="">{t.selectSupplier}</option>
-                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        
-                        <input 
-                            type="date"
-                            value={paymentDate}
-                            onChange={(e) => setPaymentDate(e.target.value)}
-                            className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                    </div>
+           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col border dark:border-slate-700">
+              <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-700">
+                 <h3 className="text-xl font-bold text-slate-800 dark:text-white">{t.receiving}</h3>
+                 <button onClick={() => setIsReceiptModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
 
-                    <div className="pt-2">
-                        <label className="block text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-3">Add Line Item</label>
-                        
-                        <div className="relative mb-3">
+              <div className="flex-1 flex overflow-hidden">
+                 {/* Left Panel: Configuration & Input */}
+                 <div className="w-1/3 border-r border-slate-100 dark:border-slate-700 p-6 flex flex-col overflow-y-auto bg-slate-50 dark:bg-slate-900/50">
+                    <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-4 uppercase text-xs tracking-wider">Receipt Settings</h4>
+                    <div className="space-y-4 mb-6">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">{t.supplier}</label>
+                            <select 
+                                value={receiptSupplier}
+                                onChange={(e) => setReceiptSupplier(e.target.value)}
+                                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            >
+                                <option value="">{t.selectSupplier}</option>
+                                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">{t.paymentDate}</label>
                             <input 
-                                type="text"
-                                value={receiptProductSearch}
-                                onChange={(e) => {
-                                    setReceiptProductSearch(e.target.value);
-                                    if (receiptProduct && e.target.value !== (lang === Language.RU ? receiptProduct.name_ru : receiptProduct.name_uk)) {
-                                        setReceiptProduct(null);
-                                    }
-                                }}
-                                placeholder={t.searchPlaceholder}
-                                className={`w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none ${receiptProduct ? 'border-green-500 ring-1 ring-green-500' : 'border-slate-300 dark:border-slate-600'}`}
+                                type="date"
+                                value={paymentDate}
+                                onChange={(e) => setPaymentDate(e.target.value)}
+                                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                             />
-                            {receiptProductSearch && !receiptProduct && modalProductSuggestions.length > 0 && (
-                                <div className="absolute z-20 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
-                                    {modalProductSuggestions.map(p => (
-                                        <div 
-                                            key={p.id} 
-                                            onClick={() => handleSelectProduct(p)}
-                                            className="px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-sm"
-                                        >
-                                            <div className="font-bold text-slate-800 dark:text-slate-200">{p.sku}</div>
-                                            <div className="text-slate-600 dark:text-slate-400 text-xs">{lang === Language.RU ? p.name_ru : p.name_uk}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                             <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{t.qty}</label>
+                        <div>
+                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">{t.extraCosts} (Global)</label>
+                             <div className="relative">
+                                <span className="absolute left-3 top-2 text-slate-400">₴</span>
                                 <input 
-                                    type="number" 
-                                    value={receiveQty}
-                                    onChange={(e) => setReceiveQty(e.target.value)}
-                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                                />
-                             </div>
-                             <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{t.unitCost} (Supplier)</label>
-                                <input 
-                                    type="number" 
-                                    value={purchasePrice}
-                                    onChange={(e) => setPurchasePrice(e.target.value)}
-                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                             </div>
-                        </div>
-
-                        <button 
-                            onClick={handleAddToReceiptList}
-                            disabled={!receiptProduct || !receiveQty}
-                            className="w-full py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                        >
-                            {t.addToReceipt}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Right: Items Table */}
-                <div className="flex-1 flex flex-col">
-                    <div className="flex justify-between items-end mb-2">
-                        <h4 className="font-bold text-slate-700 dark:text-slate-300 text-sm">{t.receiptList} ({receiptItems.length})</h4>
-                        <div className="w-48">
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 text-right">{t.extraCosts} (Global)</label>
-                            <div className="relative">
-                                <span className="absolute left-2 top-1.5 text-slate-400 text-xs">₴</span>
-                                <input 
-                                    type="number" 
+                                    type="number"
+                                    min="0"
                                     value={globalExtraCosts}
                                     onChange={(e) => setGlobalExtraCosts(e.target.value)}
-                                    className="w-full border border-orange-200 dark:border-orange-900/50 rounded px-2 py-1 pl-5 text-sm text-right bg-orange-50 dark:bg-orange-900/10 text-slate-900 dark:text-white focus:ring-1 focus:ring-orange-500 outline-none font-medium"
+                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 pl-7 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
-                            </div>
+                             </div>
+                             <p className="text-[10px] text-slate-500 mt-1">{t.costDistribution}</p>
                         </div>
                     </div>
-                    
-                    <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col">
-                        <div className="overflow-auto flex-1">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 dark:bg-slate-700 text-xs uppercase text-slate-500 dark:text-slate-300 font-semibold sticky top-0 z-10">
+
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                        <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-4 uppercase text-xs tracking-wider">Add Item</h4>
+                        <div className="space-y-4">
+                            <div className="relative">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Product</label>
+                                <input 
+                                    type="text"
+                                    placeholder="Search Name or SKU..."
+                                    value={receiptProductSearch}
+                                    onChange={(e) => {
+                                        setReceiptProductSearch(e.target.value);
+                                        if (e.target.value === '') setReceiptProduct(null);
+                                    }}
+                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                {receiptProductSearch && !receiptProduct && (
+                                    <div className="absolute z-10 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1 shadow-lg max-h-48 overflow-y-auto">
+                                        {modalProductSuggestions.map(p => (
+                                            <div 
+                                                key={p.id}
+                                                onClick={() => handleSelectProduct(p)}
+                                                className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer text-sm text-slate-700 dark:text-slate-200"
+                                            >
+                                                <div className="font-medium">{lang === Language.RU ? p.name_ru : p.name_uk}</div>
+                                                <div className="text-xs text-slate-400">{p.sku}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">{t.qty}</label>
+                                    <input 
+                                        type="number"
+                                        min="1"
+                                        value={receiveQty}
+                                        onChange={(e) => setReceiveQty(e.target.value)}
+                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Unit Cost</label>
+                                    <input 
+                                        type="number"
+                                        min="0"
+                                        value={purchasePrice}
+                                        onChange={(e) => setPurchasePrice(e.target.value)}
+                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <button 
+                                onClick={handleAddToReceiptList}
+                                disabled={!receiptProduct || !receiveQty || !purchasePrice}
+                                className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                            >
+                                {t.addToReceipt}
+                            </button>
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Right Panel: List & Summary */}
+                 <div className="w-2/3 flex flex-col bg-white dark:bg-slate-800">
+                    <div className="flex-1 overflow-auto p-0">
+                        <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                            <thead className="bg-slate-50 dark:bg-slate-700 text-xs uppercase text-slate-500 dark:text-slate-300 sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-3">Product</th>
+                                    <th className="px-4 py-3 text-center">Qty</th>
+                                    <th className="px-4 py-3 text-right">Supplier Price</th>
+                                    <th className="px-4 py-3 text-right">Landed Cost</th>
+                                    <th className="px-4 py-3 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {calculatedItems.length === 0 ? (
                                     <tr>
-                                        <th className="px-4 py-2">Product</th>
-                                        <th className="px-4 py-2 text-center">Qty</th>
-                                        <th className="px-4 py-2 text-right">{t.unitCost}</th>
-                                        <th className="px-4 py-2 text-right bg-blue-50/50 dark:bg-blue-900/10">{t.landedCost}</th>
-                                        <th className="px-4 py-2 text-right">{t.total}</th>
-                                        <th className="px-2 py-2"></th>
+                                        <td colSpan={5} className="p-8 text-center text-slate-400">
+                                            List is empty. Add products from the left panel.
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                    {calculatedItems.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                                                List is empty. Add products from the left.
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {calculatedItems.map((item, idx) => (
+                                ) : (
+                                    calculatedItems.map((item, idx) => (
                                         <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                            <td className="px-4 py-2 font-medium text-slate-800 dark:text-slate-200">
+                                            <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
                                                 {lang === Language.RU ? item.product.name_ru : item.product.name_uk}
                                                 <div className="text-xs text-slate-400 font-mono">{item.product.sku}</div>
                                             </td>
-                                            <td className="px-4 py-2 text-center">{item.qty}</td>
-                                            <td className="px-4 py-2 text-right text-slate-500">
-                                                {item.supplierUnitPrice}
+                                            <td className="px-4 py-3 text-center">{item.qty}</td>
+                                            <td className="px-4 py-3 text-right">₴ {item.supplierUnitPrice}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-blue-600 dark:text-blue-400">
+                                                ₴ {item.landedUnitCost.toFixed(2)}
                                             </td>
-                                            <td className="px-4 py-2 text-right font-bold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">
-                                                {item.landedUnitCost.toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-2 text-right text-slate-800 dark:text-slate-200">
-                                                {item.supplierTotalCost.toLocaleString()}
-                                            </td>
-                                            <td className="px-2 py-2 text-center">
+                                            <td className="px-4 py-3 text-center">
                                                 <button onClick={() => handleRemoveFromList(idx)} className="text-red-400 hover:text-red-600">×</button>
                                             </td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        {/* Financial Summary */}
-                        <div className="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-4">
-                            <div className="grid grid-cols-3 gap-8">
-                                <div>
-                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t.totalGoodsValue}</p>
-                                    <p className="text-xl font-bold text-slate-800 dark:text-white">₴ {totalSupplierValue.toLocaleString()}</p>
-                                    <p className="text-[10px] text-slate-400">Payable to Supplier</p>
-                                </div>
-                                <div className="text-center">
-                                     <p className="text-xs text-orange-500 uppercase font-bold mb-1">{t.shippingCost}</p>
-                                     <p className="text-xl font-bold text-orange-600">₴ {parseFloat(globalExtraCosts || '0').toLocaleString()}</p>
-                                     <p className="text-[10px] text-slate-400">{t.costDistribution}</p>
-                                </div>
-                                <div className="text-right">
-                                     <p className="text-xs text-blue-600 uppercase font-bold mb-1">{t.totalLandedValue}</p>
-                                     <p className="text-xl font-bold text-blue-700 dark:text-blue-400">₴ {totalLandedValue.toLocaleString()}</p>
-                                     <p className="text-[10px] text-slate-400">New Inventory Value</p>
-                                </div>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {/* Summary Footer */}
+                    <div className="border-t border-slate-200 dark:border-slate-700 p-6 bg-slate-50 dark:bg-slate-900/50">
+                        <div className="grid grid-cols-3 gap-6 mb-4">
+                            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-500 uppercase font-bold">{t.totalGoodsValue}</p>
+                                <p className="text-xl font-bold text-slate-800 dark:text-white">₴ {totalSupplierValue.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-500 uppercase font-bold">{t.shippingCost}</p>
+                                <p className="text-xl font-bold text-orange-600">₴ {parseFloat(globalExtraCosts || '0').toLocaleString()}</p>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-500 uppercase font-bold">{t.totalLandedValue}</p>
+                                <p className="text-xl font-bold text-blue-600 dark:text-blue-400">₴ {totalLandedValue.toLocaleString()}</p>
                             </div>
                         </div>
+                        <div className="flex justify-end gap-3">
+                             <button 
+                                onClick={() => setIsReceiptModalOpen(false)}
+                                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                {t.cancel}
+                            </button>
+                            <button 
+                                onClick={handleFinalizeReceipt}
+                                disabled={calculatedItems.length === 0 || !receiptSupplier}
+                                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {t.finishReceipt}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-              <button 
-                onClick={() => setIsReceiptModalOpen(false)} 
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                {t.cancel}
-              </button>
-              <button 
-                onClick={handleFinalizeReceipt} 
-                disabled={receiptItems.length === 0}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t.finishReceipt}
-              </button>
-            </div>
-          </div>
+                 </div>
+              </div>
+           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Order, Language, OrderSource, OrderStatus } from '../types';
 import { UI_TEXT } from '../constants';
@@ -8,9 +7,10 @@ interface OrderListProps {
   lang: Language;
   onSelectOrder: (orderId: number) => void;
   onCreateOrder: () => void;
+  onDeleteOrder: (id: number) => void;
 }
 
-const OrderList: React.FC<OrderListProps> = ({ orders, lang, onSelectOrder, onCreateOrder }) => {
+const OrderList: React.FC<OrderListProps> = ({ orders, lang, onSelectOrder, onCreateOrder, onDeleteOrder }) => {
   const t = UI_TEXT[lang];
 
   const getSourceBadge = (source: OrderSource) => {
@@ -33,6 +33,13 @@ const OrderList: React.FC<OrderListProps> = ({ orders, lang, onSelectOrder, onCr
       case OrderStatus.DELIVERED: return 'bg-green-50 text-green-700';
       case OrderStatus.CANCELED: return 'bg-red-50 text-red-700';
       default: return 'bg-slate-50 text-slate-700';
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if(window.confirm('Are you sure you want to delete this order?')) {
+        onDeleteOrder(id);
     }
   };
 
@@ -66,6 +73,7 @@ const OrderList: React.FC<OrderListProps> = ({ orders, lang, onSelectOrder, onCr
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Total</th>
                 <th className="px-6 py-4">{t.status}</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -91,6 +99,15 @@ const OrderList: React.FC<OrderListProps> = ({ orders, lang, onSelectOrder, onCr
                     <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wide ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
+                  </td>
+                   <td className="px-6 py-4 text-right">
+                    <button 
+                        onClick={(e) => handleDelete(e, order.id)}
+                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                        title="Delete Order"
+                    >
+                        🗑️
+                    </button>
                   </td>
                 </tr>
               ))}

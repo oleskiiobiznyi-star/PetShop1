@@ -102,11 +102,35 @@ export interface Order {
   items: OrderItem[];
 }
 
+export interface ReceiptItem {
+  product: Product;
+  qty: number;
+  supplierUnitPrice: number; // Price we pay the supplier
+  originalDbPrice: number; // Price currently in DB
+  supplierTotalCost: number; // Calculated
+  landedUnitCost: number; // Calculated with shipping
+  landedTotalCost: number; // Calculated with shipping
+}
+
+export interface WarehouseReceipt {
+  id: number;
+  supplierId: number;
+  supplierName: string;
+  date: string;
+  paymentDueDate: string;
+  totalAmount: number; // Amount owed to supplier
+  isPaid: boolean;
+  itemsCount: number;
+  items: ReceiptItem[];
+}
+
 export interface DashboardMetrics {
   totalSales: number;
   totalOrders: number;
   averageCheck: number;
   pendingOrders: number;
+  netProfit: number;
+  accountsPayable: number; // Total unpaid to suppliers
 }
 
 export interface AppSettings {
@@ -116,4 +140,4 @@ export interface AppSettings {
   bankCommission: number; // Percentage
 }
 
-export type ViewState = 'dashboard' | 'products' | 'warehouse' | 'orders' | 'directories' | 'analytics' | 'settings';
+export type ViewState = 'dashboard' | 'products' | 'warehouse' | 'orders' | 'directories' | 'analytics' | 'settings' | 'settlements';

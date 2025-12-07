@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Product, Language } from '../types';
 import { UI_TEXT } from '../constants';
@@ -9,6 +8,7 @@ interface ProductListProps {
   lang: Language;
   onUpdateProduct: (product: Product) => void;
   onAddProduct: (product: Product) => void;
+  onDeleteProduct: (id: number) => void;
 }
 
 interface ColumnMapping {
@@ -29,7 +29,7 @@ interface DiffItem {
   selected: boolean;
 }
 
-const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProduct, onAddProduct }) => {
+const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProduct, onAddProduct, onDeleteProduct }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -79,6 +79,12 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
       : 0;
     setCalcMargin(Number(margin.toFixed(2)));
     setIsModalOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+        onDeleteProduct(id);
+    }
   };
 
   const handleAddNew = () => {
@@ -262,7 +268,7 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
               onClick={() => setIsImportModalOpen(true)}
               className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
             >
-              📥 {t.import}
+              <span>📥</span> {t.import}
             </button>
             <button 
               onClick={handleAddNew}
@@ -285,7 +291,7 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                   <th className="px-6 py-4 text-right">{t.price}</th>
                   <th className="px-6 py-4 text-right">{t.margin}</th>
                   <th className="px-6 py-4">{t.stock}</th>
-                  <th className="px-6 py-4">Action</th>
+                  <th className="px-6 py-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -324,12 +330,18 @@ const ProductList: React.FC<ProductListProps> = ({ products, lang, onUpdateProdu
                           {product.stock} units
                         </span>
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 text-right space-x-2">
                         <button 
                           onClick={() => handleEdit(product)}
                           className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
                         >
                           {t.edit}
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(product.id)}
+                          className="text-red-500 hover:text-red-700 font-medium"
+                        >
+                          {t.delete}
                         </button>
                       </td>
                     </tr>

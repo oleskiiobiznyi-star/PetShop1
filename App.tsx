@@ -1,8 +1,6 @@
-
-
 import React, { useState, useEffect } from 'react';
-import { Language, ViewState, Product, Order, AppSettings, Supplier, Customer, OrderStatus, OrderSource, PaymentStatus, PaymentMethod, Category } from './types';
-import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS, MOCK_CUSTOMERS, MOCK_CATEGORIES } from './constants';
+import { Language, ViewState, Product, Order, AppSettings, Supplier, Customer, OrderStatus, OrderSource, PaymentStatus, PaymentMethod, Category, WarehouseReceipt } from './types';
+import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_SUPPLIERS, MOCK_CUSTOMERS, MOCK_CATEGORIES, MOCK_RECEIPTS } from './constants';
 import Dashboard from './components/Dashboard';
 import ProductList from './components/ProductList';
 import OrderList from './components/OrderList';
@@ -10,6 +8,7 @@ import OrderDetail from './components/OrderDetail';
 import Settings from './components/Settings';
 import Warehouse from './components/Warehouse';
 import Directories from './components/Directories';
+import SupplierSettlements from './components/SupplierSettlements';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -19,6 +18,7 @@ const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
   const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
   const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
+  const [warehouseReceipts, setWarehouseReceipts] = useState<WarehouseReceipt[]>(MOCK_RECEIPTS);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
@@ -38,12 +38,41 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  const metrics = {
-    totalSales: orders.reduce((acc, curr) => acc + curr.total, 0),
-    totalOrders: orders.length,
-    averageCheck: orders.reduce((acc, curr) => acc + curr.total, 0) / orders.length,
-    pendingOrders: orders.filter(o => o.status === OrderStatus.NEW || o.status === OrderStatus.ACCEPTED).length
+  // Dashboard Metrics Calculation
+  const calculateMetrics = () => {
+      // 1. Sales & Orders
+      const totalSales = orders.reduce((acc, curr) => acc + curr.total, 0);
+      const totalOrders = orders.length;
+      const averageCheck = totalOrders > 0 ? totalSales / totalOrders : 0;
+      const pendingOrders = orders.filter(o => o.status === OrderStatus.NEW || o.status === OrderStatus.ACCEPTED).length;
+
+      // 2. Net Profit Calculation (Revenue - COGS - ShippingExp - BankFee)
+      // Note: This is simplified. COGS should technically track historical cost, here using current product.purchasePrice
+      let netProfit = 0;
+      orders.forEach(order => {
+          const revenue = order.total;
+          let cogs = 0;
+          order.items.forEach(item => {
+              const product = products.find(p => p.id === item.productId);
+              if (product) cogs += product.purchasePrice * item.quantity;
+          });
+          const shipping = order.shippingCost || 0;
+          const bankFee = revenue * (appSettings.bankCommission / 100);
+          
+          if (order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.RETURN) {
+              netProfit += (revenue - cogs - shipping - bankFee);
+          }
+      });
+
+      // 3. Accounts Payable
+      const accountsPayable = warehouseReceipts
+          .filter(r => !r.isPaid)
+          .reduce((acc, curr) => acc + curr.totalAmount, 0);
+
+      return { totalSales, totalOrders, averageCheck, pendingOrders, netProfit, accountsPayable };
   };
+
+  const metrics = calculateMetrics();
 
   const handleNavClick = (view: ViewState) => {
     setCurrentView(view);
@@ -52,6 +81,11 @@ const App: React.FC = () => {
 
   const handleUpdateOrder = (updatedOrder: Order) => {
     setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+  };
+
+  const handleDeleteOrder = (id: number) => {
+    setOrders(orders.filter(o => o.id !== id));
+    if (selectedOrderId === id) setSelectedOrderId(null);
   };
 
   const handleCreateOrder = () => {
@@ -80,6 +114,24 @@ const App: React.FC = () => {
 
   const handleUpdateProduct = (updatedProduct: Product) => {
     setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  };
+
+  const handleDeleteProduct = (id: number) => {
+    setProducts(products.filter(p => p.id !== id));
+  };
+
+  const handleCreateReceipt = (receipt: WarehouseReceipt) => {
+      setWarehouseReceipts([receipt, ...warehouseReceipts]);
+  };
+
+  const handleDeleteReceipt = (id: number) => {
+      setWarehouseReceipts(warehouseReceipts.filter(r => r.id !== id));
+  };
+
+  const handleMarkReceiptPaid = (id: number) => {
+      setWarehouseReceipts(warehouseReceipts.map(r => 
+          r.id === id ? { ...r, isPaid: true } : r
+      ));
   };
 
   // Directory Handlers
@@ -139,7 +191,7 @@ const App: React.FC = () => {
               my-dog.com.ua
             </h1>
           </div>
-          <p className="text-xs text-slate-400 mt-1 pl-10 font-medium tracking-wide">CRM & WMS v2.7</p>
+          <p className="text-xs text-slate-400 mt-1 pl-10 font-medium tracking-wide">CRM & WMS v2.9</p>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -148,6 +200,7 @@ const App: React.FC = () => {
           <NavItem view="warehouse" icon="🏭" label={lang === Language.RU ? 'Склад' : 'Склад'} />
           <NavItem view="orders" icon="🛒" label={lang === Language.RU ? 'Заказы' : 'Замовлення'} />
           <NavItem view="directories" icon="📚" label={lang === Language.RU ? 'Справочники' : 'Довідники'} />
+          <NavItem view="settlements" icon="💸" label={lang === Language.RU ? 'Расчеты' : 'Розрахунки'} />
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
              <NavItem view="settings" icon="⚙️" label={lang === Language.RU ? 'Настройки' : 'Налаштування'} />
           </div>
@@ -198,7 +251,7 @@ const App: React.FC = () => {
         </header>
 
         <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20">
-          {currentView === 'dashboard' && <Dashboard metrics={metrics} lang={lang} />}
+          {currentView === 'dashboard' && <Dashboard metrics={metrics} orders={orders} warehouseReceipts={warehouseReceipts} lang={lang} />}
           
           {currentView === 'products' && (
             <ProductList 
@@ -206,6 +259,7 @@ const App: React.FC = () => {
               lang={lang}
               onUpdateProduct={handleUpdateProduct}
               onAddProduct={(p) => setProducts([p, ...products])}
+              onDeleteProduct={handleDeleteProduct}
             />
           )}
 
@@ -215,6 +269,7 @@ const App: React.FC = () => {
               lang={lang}
               onUpdateProduct={handleUpdateProduct}
               suppliers={suppliers}
+              onCreateReceipt={handleCreateReceipt}
             />
           )}
 
@@ -224,6 +279,7 @@ const App: React.FC = () => {
               lang={lang} 
               onSelectOrder={(id) => setSelectedOrderId(id)}
               onCreateOrder={handleCreateOrder}
+              onDeleteOrder={handleDeleteOrder}
             />
           )}
 
@@ -253,6 +309,15 @@ const App: React.FC = () => {
                   onUpdateCategory={handleUpdateCategory}
                   onAddCategory={handleAddCategory}
                   onDeleteCategory={handleDeleteCategory}
+              />
+          )}
+
+          {currentView === 'settlements' && (
+              <SupplierSettlements
+                  lang={lang}
+                  receipts={warehouseReceipts}
+                  onMarkPaid={handleMarkReceiptPaid}
+                  onDeleteReceipt={handleDeleteReceipt}
               />
           )}
 
